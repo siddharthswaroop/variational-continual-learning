@@ -56,9 +56,9 @@ class SplitMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
-hidden_size = [4]
-batch_size = None
-no_epochs = 2000
+hidden_size = [256]
+batch_size = 256
+no_epochs = 140
 no_iters = 1
 coreset_size = 40
 
@@ -79,7 +79,7 @@ if option == 1:
     data_gen = SplitMnistGenerator()
     vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
         coreset.rand_from_batch, coreset_size, batch_size, no_iters=no_iters)
-    print vcl_result
+    # print vcl_result
     #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
 elif option == 2:

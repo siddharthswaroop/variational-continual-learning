@@ -133,7 +133,7 @@ class SplitMnistGenerator():
 hidden_size_toy = 100
 hidden_size = [100]
 batch_size = 256
-no_epochs = 300
+no_epochs = 100
 no_iters = 1
 coreset_size = 40
 

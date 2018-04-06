@@ -8,7 +8,7 @@ import matplotlib.mlab as mlab
 import pdb
 
 
-def visualise_weights(path=""):
+def visualise_weights(no_hiddens=256, path=""):
     res_0 = np.load(path + 'weights_0.npz')
     lower_0 = res_0['lower']
     m0 = lower_0[0, :]
@@ -19,7 +19,7 @@ def visualise_weights(path=""):
     m1 = lower_1[0, :]
     v1 = np.exp(lower_1[1, :])
 
-    no_hiddens = 256
+    #no_hiddens = 100
     in_dim = 784
     in_size = [28, 28]
     no_params = in_dim * no_hiddens
@@ -104,7 +104,7 @@ def visualise_weights(path=""):
 # pdb.set_trace()
 
 
-def check_weight_pruning(path=""):
+def check_weight_pruning(no_hiddens=256, path=""):
     res_0 = np.load(path + 'weights_0.npz')
     lower_0 = res_0['lower']
     m0 = lower_0[0, :]
@@ -125,7 +125,7 @@ def check_weight_pruning(path=""):
     m3 = upper_1[0, :]
     v3 = np.exp(upper_1[1, :])
 
-    no_hiddens = 256
+    # no_hiddens = 100
     in_dim = 784
     in_size = [28, 28]
     no_params = in_dim * no_hiddens
@@ -140,6 +140,7 @@ def check_weight_pruning(path=""):
     m3 = m3[:no_params].reshape([no_hiddens, 2])
     v3 = v3[:no_params].reshape([no_hiddens, 2])
 
+"""
     print np.max(m2)
     print np.min(m2)
     print np.max(m3)
@@ -151,7 +152,7 @@ def check_weight_pruning(path=""):
     print v2[54:57]
     print v2[62:65]
 
-"""
+
     # task 1
     x = np.linspace(-2, 2, 100)
     lims = 10
@@ -186,7 +187,8 @@ def check_weight_pruning(path=""):
 """
 
 if __name__ == "__main__":
+    no_hiddens = 256
     # check_weight_pruning(path='small_init/')
     # visualise_weights(path='small_init/')
-    check_weight_pruning()
-    visualise_weights()
+    check_weight_pruning(no_hiddens)
+    visualise_weights(no_hiddens)
