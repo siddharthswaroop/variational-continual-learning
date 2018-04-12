@@ -342,6 +342,11 @@ class MFVI_NN(object):
             self.upper_nets[task_idx].v0: prior_upper[1],
             self.training_size: N}
 
+        # For visualising how weights change during training
+        epoch_pause = [20, 80, 140, 142, 144, 146, 148, 150]
+        lower_post_epoch = []
+        upper_post_epoch = []
+
         # Training cycle
         for epoch in range(no_epochs):
             perm_inds = range(x_train.shape[0])
@@ -371,8 +376,15 @@ class MFVI_NN(object):
                 print("Epoch:", '%04d' % (epoch + 1), "cost=", \
                       "{:.9f}".format(avg_cost))
             costs.append(avg_cost)
+
+            if epoch in epoch_pause:
+                lower_post_epoch1, upper_post_epoch1 = self.get_weights(task_idx)
+                lower_post_epoch.append(lower_post_epoch1)
+                upper_post_epoch.append(upper_post_epoch1)
+                # print epoch
+
         print("Optimization Finished!")
-        return costs
+        return costs, lower_post_epoch, upper_post_epoch
 
     def prediction(self, x_test, task_idx, batch_size=1000):
         # Test model

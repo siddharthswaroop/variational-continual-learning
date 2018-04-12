@@ -165,16 +165,16 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                 ## faster convergence
 
                 ## init using the maximum likeihood solution + small variances
-                ml_model.init_session(task_id, learning_rate=0.002)
-                ml_model.train(x_train, y_train, task_id,
-                               no_epochs=50, batch_size=bsize)
-                ml_lower, ml_upper = ml_model.get_weights(task_id)
-                lower_post = init_post(lower_mv, init_using_cav=False, ml_weights=ml_lower)
-                upper_post = init_post(upper_mv, init_using_cav=False, ml_weights=ml_upper)
+                # ml_model.init_session(task_id, learning_rate=0.002)
+                #ml_model.train(x_train, y_train, task_id,
+                #               no_epochs=50, batch_size=bsize)
+                #ml_lower, ml_upper = ml_model.get_weights(task_id)
+                #lower_post = init_post(lower_mv, init_using_cav=False, ml_weights=ml_lower)
+                #upper_post = init_post(upper_mv, init_using_cav=False, ml_weights=ml_upper)
 
                 ## init using random means + small variances
-                # lower_post = init_post(lower_mv, init_using_cav=False)
-                # upper_post = init_post(upper_mv, init_using_cav=False)
+                lower_post = init_post(lower_mv, init_using_cav=False)
+                upper_post = init_post(upper_mv, init_using_cav=False)
 
                 ## init using the prior or cavity
                 # lower_post = init_post(lower_mv, init_using_cav=True)
@@ -195,7 +195,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                 task_id, lower_post, upper_post, lower_transform, upper_transform)
             # train on non-coreset data
             model.reset_optimiser()
-            model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize)
+            test, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize)
             # get params and update factor
             lower_post, upper_post = model.get_weights(task_id)
             factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
@@ -230,6 +230,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                                           data_factor=False, core_factor=True)
 
         np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
+        np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
 
         # Make prediction
         lower_post, upper_post = factory.compute_dist(
@@ -245,6 +246,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             all_acc = np.vstack([all_acc, acc])
         print acc
         print all_acc
+
         # all_acc = utils.concatenate_results(acc, all_acc)
         # pdb.set_trace()
         model.close_session()
