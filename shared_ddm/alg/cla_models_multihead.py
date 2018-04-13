@@ -382,7 +382,6 @@ class MFVI_NN(object):
                 lower_post_epoch1, upper_post_epoch1 = self.get_weights(task_idx)
                 lower_post_epoch.append(lower_post_epoch1)
                 upper_post_epoch.append(upper_post_epoch1)
-                # print epoch
 
         print("Optimization Finished!")
         return costs, lower_post_epoch, upper_post_epoch

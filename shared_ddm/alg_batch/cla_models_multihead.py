@@ -286,7 +286,9 @@ class MFVI_NN(object):
         self.no_train_samples = no_train_samples
         self.no_test_samples = no_test_samples
         # input and output placeholders
-        self.x = tf.placeholder(tf.float32, [None, lower_size[0]])
+        self.x = [
+            tf.placeholder(tf.float32, [None, lower_size[0]])
+            for upper_size in upper_sizes]
         self.ys = [
             tf.placeholder(tf.float32, [None, upper_size[-1]])
             for upper_size in upper_sizes]
@@ -302,20 +304,22 @@ class MFVI_NN(object):
 
     def _build_costs(self):
         kl_lower = self.lower_net.KL_term()
-        costs = []
+        #costs = []
+        costs = 0.0
         N = tf.cast(self.training_size, tf.float32)
         for t, upper_net in enumerate(self.upper_nets):
             kl_upper = upper_net.KL_term()
             log_pred = self.log_prediction_fn(
-                self.x, self.ys[t], t, self.no_train_samples)
+                self.x[t], self.ys[t], t, self.no_train_samples)
             cost = tf.div(kl_lower + kl_upper, N) - log_pred
-            costs.append(cost)
+            costs = costs + cost
+            #costs.append(cost)
         return costs
 
     def _build_preds(self):
         preds = []
         for t, upper_net in enumerate(self.upper_nets):
-            pred = self.prediction_fn(self.x, t, self.no_test_samples)
+            pred = self.prediction_fn(self.x[t], t, self.no_test_samples)
             preds.append(pred)
         return preds
 
@@ -333,8 +337,8 @@ class MFVI_NN(object):
             tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=targets))
         return log_lik
 
-    def init_session(self, task_idx, learning_rate):
-        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.costs[task_idx])
+    def init_session(self, learning_rate):
+        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.costs)
         # Initializing the variables
         init = tf.global_variables_initializer()
         # launch a session
@@ -344,46 +348,52 @@ class MFVI_NN(object):
     def close_session(self):
         self.sess.close()
 
-    def train(self, x_train, y_train, task_idx, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=10):
-        N = x_train.shape[0]
-        if batch_size > N:
-            batch_size = N
+    def train(self, x_train, y_train, no_tasks, prior_lower, prior_upper,
+              no_epochs=1000, batch_size=100, display_epoch=5):
+
+        # Batch training: only train on smallest dataset size
+        Nmin = min([x_train[task_id].shape[0] for task_id in range(no_tasks)])
+
         sess = self.sess
         costs = []
         feed_dict = {
             self.lower_net.m0: prior_lower[0],
             self.lower_net.v0: prior_lower[1],
-            self.upper_nets[task_idx].m0: prior_upper[0],
-            self.upper_nets[task_idx].v0: prior_upper[1],
-            self.training_size: N}
+            self.training_size: Nmin}
 
-        # For visualising how weights change during training
-        # epoch_pause = [20, 80, 140, 142, 144, 146, 148, 150]
-        epoch_pause = []
-        lower_post_epoch = []
-        upper_post_epoch = []
 
         # Training cycle
         for epoch in range(no_epochs):
-            perm_inds = range(x_train.shape[0])
-            np.random.shuffle(perm_inds)
-            cur_x_train = x_train[perm_inds]
-            cur_y_train = y_train[perm_inds]
+            cur_x_train = []
+            cur_y_train = []
 
+            for task_id in range(no_tasks):
+                x_train_interm = x_train[task_id]
+                N = x_train_interm.shape[0]
+                if batch_size > N:
+                    batch_size = N
+                perm_inds = range(x_train_interm.shape[0])
+                np.random.shuffle(perm_inds)
+                x_train_interm = x_train[task_id]
+                y_train_interm = y_train[task_id]
+                cur_x_train.append(x_train_interm[perm_inds])
+                cur_y_train.append(y_train_interm[perm_inds])
+                feed_dict[self.upper_nets[task_id].m0] = prior_upper[0]
+                feed_dict[self.upper_nets[task_id].v0] = prior_upper[1]
+
+            N = Nmin
             avg_cost = 0.
             total_batch = int(np.ceil(N * 1.0 / batch_size))
             # Loop over all batches
             for i in range(total_batch):
                 start_ind = i * batch_size
                 end_ind = np.min([(i + 1) * batch_size, N])
-                batch_x = cur_x_train[start_ind:end_ind, :]
-                batch_y = cur_y_train[start_ind:end_ind, :]
-                feed_dict[self.x] = batch_x
-                feed_dict[self.ys[task_idx]] = batch_y
+                for task_id in range(no_tasks):
+                    feed_dict[self.x[task_id]] = cur_x_train[task_id][start_ind:end_ind, :]
+                    feed_dict[self.ys[task_id]] = cur_y_train[task_id][start_ind:end_ind, :]
                 # Run optimization op (backprop) and cost op (to get loss value)
                 _, c = sess.run(
-                    [self.train_step, self.costs[task_idx]],
+                    [self.train_step, self.costs],
                     feed_dict=feed_dict)
                 # Compute average loss
                 avg_cost += c / total_batch
@@ -394,14 +404,8 @@ class MFVI_NN(object):
                       "{:.9f}".format(avg_cost))
             costs.append(avg_cost)
 
-            if epoch in epoch_pause:
-                lower_post_epoch1, upper_post_epoch1 = self.get_weights(task_idx)
-                lower_post_epoch.append(lower_post_epoch1)
-                upper_post_epoch.append(upper_post_epoch1)
-                # print epoch
-
         print("Optimization Finished!")
-        return costs, lower_post_epoch, upper_post_epoch
+        return costs
 
     def prediction(self, x_test, task_idx, batch_size=1000):
         # Test model
@@ -414,7 +418,7 @@ class MFVI_NN(object):
             batch_x = x_test[start_ind:end_ind, :]
             prediction = self.sess.run(
                 [self.preds[task_idx]],
-                feed_dict={self.x: batch_x})[0]
+                feed_dict={self.x[task_idx]: batch_x})[0]
             if i == 0:
                 predictions = prediction
             else:
@@ -424,7 +428,7 @@ class MFVI_NN(object):
     def prediction_prob(self, x_test, task_idx, batch_size=1000):
         prob = self.sess.run(
             [tf.nn.softmax(self.prediction(x_test, task_idx, batch_size))],
-            feed_dict={self.x: x_test})[0]
+            feed_dict={self.x[task_idx]: x_test})[0]
         return prob
 
     def get_weights(self, task_idx):

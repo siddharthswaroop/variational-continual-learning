@@ -195,7 +195,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                 task_id, lower_post, upper_post, lower_transform, upper_transform)
             # train on non-coreset data
             model.reset_optimiser()
-            test, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize)
+            _, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize)
             # get params and update factor
             lower_post, upper_post = model.get_weights(task_id)
             factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,

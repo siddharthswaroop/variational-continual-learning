@@ -50,7 +50,7 @@ def visualise_weights_ml(no_hiddens=256, path=""):
     print "creating figures ..."
     fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
 
-    fig0.suptitle("mean after task 1, min = %f, max = %f" % (np.min(np.absolute(m0)), np.max(np.absolute(m0))))
+    fig0.suptitle("means, min = %f, max = %f" % (np.min(np.absolute(m0)), np.max(np.absolute(m0))))
 
     for i in range(no_rows):
         for j in range(no_cols):
@@ -66,6 +66,78 @@ def visualise_weights_ml(no_hiddens=256, path=""):
 
     #fig0.savefig('/tmp/lower_mean_1.pdf')
 
+
+def visualise_weights_vi_batch(no_hiddens=256, path=""):
+    res_0 = np.load(path + 'weights_vi_batch.npz')
+    lower_0 = res_0['lower']
+    m0 = lower_0[0, :]
+    v0 = np.exp(lower_0[1, :])
+
+    upper_0 = res_0['upper']
+    m1 = upper_0[0][0,:]
+    m2 = upper_0[1][0,:]
+    m3 = upper_0[2][0,:]
+    v1 = np.exp(upper_0[0][1,:])
+    v2 = np.exp(upper_0[1][1,:])
+    v3 = np.exp(upper_0[2][1,:])
+
+    #no_hiddens = 100
+    in_dim = 784
+    in_size = [28, 28]
+    no_params = in_dim * no_hiddens
+    m0 = m0[:no_params].reshape([in_dim, no_hiddens])
+    v0 = v0[:no_params].reshape([in_dim, no_hiddens])
+    m0min, m0max = np.min(m0), np.max(m0)
+    v0min, v0max = np.min(v0), np.max(v0)
+
+    no_params = no_hiddens * 2
+    m1 = m1[:no_params].reshape([no_hiddens, 2])
+    v1 = v1[:no_params].reshape([no_hiddens, 2])
+    m2 = m2[:no_params].reshape([no_hiddens, 2])
+    v2 = v2[:no_params].reshape([no_hiddens, 2])
+    m3 = m3[:no_params].reshape([no_hiddens, 2])
+    v3 = v3[:no_params].reshape([no_hiddens, 2])
+
+
+    test = m3
+    #print test
+    for i in range(5):
+        print np.argmax(np.abs(test),0)
+        print test[np.argmax(np.abs(test),0)]
+        test[np.argmax(np.abs(test), 0)] = [[0, 0],[0, 0]]
+
+
+
+
+    """
+    no_cols = int(np.sqrt(no_hiddens))
+    no_rows = int(np.sqrt(no_hiddens))
+    print "creating figures ..."
+    fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
+    fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
+
+    fig0.suptitle("means, min = %f, max = %f" % (np.min(np.absolute(m0)), np.max(np.absolute(m0))))
+    fig1.suptitle("variances, min = %f, max = %f" % (np.min(np.absolute(v0)), np.max(np.absolute(v0))))
+
+    for i in range(no_rows):
+        for j in range(no_cols):
+            #print i, j
+            k = i * no_cols + j
+            ma = m0[:, k].reshape(in_size)
+            va = v0[:, k].reshape(in_size)
+
+            axs0[i, j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m0min, vmax=m0max)
+            axs0[i, j].set_xticks(np.array([]))
+            axs0[i, j].set_yticks(np.array([]))
+
+            axs1[i, j].matshow(va, cmap=matplotlib.cm.binary, vmin=v0min, vmax=v0max)
+            axs1[i, j].set_xticks(np.array([]))
+            axs1[i, j].set_yticks(np.array([]))
+
+    plt.show()
+
+    #fig0.savefig('/tmp/lower_mean_1.pdf')
+"""
 
 
 def visualise_weights(no_hiddens=256, path=""):
@@ -338,4 +410,4 @@ if __name__ == "__main__":
     # visualise_weights(path='small_init/')
     # check_weight_pruning(no_hiddens)
     # visualise_weights_epoch(no_hiddens,epoch_pause)
-    visualise_weights_ml(no_hiddens)
+    visualise_weights_vi_batch(no_hiddens)

@@ -161,3 +161,82 @@ def run_vcl_shared_ml(hidden_size, no_epochs, data_gen, coreset_method,
     ml_model.close_session()
 
     return acc
+
+
+def run_vcl_shared_vi(hidden_size, no_epochs, data_gen, coreset_method,
+                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.005):
+    in_dim, out_dim = data_gen.get_dims()
+    x_coresets, y_coresets = [], []
+    x_testsets, y_testsets = [], []
+    x_trainsets, y_trainsets = [], []
+
+    all_acc = np.array([])
+    no_tasks = data_gen.max_iter
+    for i in range(no_tasks):
+        x_train, y_train, x_test, y_test = data_gen.next_task()
+        x_trainsets.append(x_train)
+        y_trainsets.append(y_train)
+        x_testsets.append(x_test)
+        y_testsets.append(y_test)
+
+    # creating model
+    lower_size = [in_dim] + deepcopy(hidden_size)
+    upper_sizes = [[hidden_size[-1], out_dim] for i in range(no_tasks)]
+    model = MFVI_NN(lower_size, upper_sizes)
+    # we also create a model trained using maximum likelihood
+    # ml_model = ML_NN(lower_size, upper_sizes)
+    no_lower_weights = model.lower_net.no_weights
+    no_upper_weights = [net.no_weights for net in model.upper_nets]
+    factory = FactorManager(no_tasks, no_lower_weights, no_upper_weights)
+
+    # get data
+    x_train, y_train = x_trainsets[0], y_trainsets[0]
+    x_test, y_test = x_testsets[0], y_testsets[0]
+    bsize = x_train.shape[0] if (batch_size is None) else batch_size
+
+    ## init using random means + small variances
+    model.init_session(learning_rate)
+
+    lower_data_idx = range(no_tasks - 1)
+    lower_core_idx = range(no_tasks)
+    lower_cav, upper_cav = factory.compute_dist(
+        lower_data_idx, lower_core_idx,
+        [no_tasks-1], remove_core=False, remove_data=True)
+    lower_mv = [lower_cav[0], lower_cav[1]]
+    upper_mv = [upper_cav[0][0], upper_cav[1][0]]
+    lower_n = [lower_cav[2], lower_cav[3]]
+    upper_n = [upper_cav[2][0], upper_cav[3][0]]
+    lower_post = init_post(lower_mv, init_using_cav=False)
+
+    upper_post = []
+    for task_id in range(no_tasks):
+        upper_post.append(init_post(upper_mv, init_using_cav=False))
+
+    upper_transform = log_func
+    lower_transform = log_func
+
+    model.assign_weights(
+        range(no_tasks), lower_post, upper_post, lower_transform, upper_transform)
+
+    model.train(x_trainsets, y_trainsets, no_tasks, lower_mv, upper_mv, no_epochs, bsize)
+
+    upper_post = []
+    for task_id in range(no_tasks):
+        lower_post, upper_post_interm = model.get_weights(task_id)
+        upper_post.append(upper_post_interm)
+
+    np.savez('sandbox/weights_vi_batch.npz', lower=lower_post, upper=upper_post)
+
+    # Make prediction
+    lower_mv = [lower_post[0], lower_post[1]]
+    upper_mv = [[upper_post[i][0], upper_post[i][1]] for i in range(no_tasks)]
+    model.assign_weights(range(no_tasks), lower_mv, upper_mv, ide_func, ide_func)
+    # pdb.set_trace()
+    acc = utils.get_scores(model, x_testsets, y_testsets)
+    print acc
+
+    # all_acc = utils.concatenate_results(acc, all_acc)
+    # pdb.set_trace()
+    model.close_session()
+
+    return acc

@@ -57,26 +57,16 @@ class SplitMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
+
 hidden_size = [256]
 batch_size = 256
 no_epochs = 20
 
-
-# 0v1 2v3 8v9, batch_size = 256, hidden_size = [256], Adam learning rate = 0.001
-# 10  epochs - [0.9995271867612293, 0.9774730656219393, 0.9818456883509834]
-# 20  epochs - [0.9995271867612293, 0.9784524975514202, 0.9778113968734241]
-# 100 epochs - [0.9995271867612293, 0.9760039177277179, 0.9752899646999496]
-
-# 0v1 2v3 8v9, batch_size = 256, hidden_size = [256, 256], Adam learning rate = 0.001
-# 10  epochs - [0.9990543735224586, 0.9946131243878551, 0.9919314170448815]
-# 20  epochs - [0.9995271867612293, 0.9951028403525954, 0.9909228441754917]
-# 100 epochs - [0.9990543735224586, 0.9965719882468168, 0.9934442763489663]
-
-# 0v1 2v3 8v9, batch_size = 256, hidden_size = [256], Adam learning rate = 0.0005
-# 10  epochs - [0.9995271867612293, 0.9789422135161606, 0.9823499747856783]
-# 20  epochs - [0.9995271867612293, 0.9789422135161606, 0.9823499747856783]
-# 100 epochs - [0.9995271867612293, 0.9774730656219393, 0.9757942511346445]
-
+# 10  epochs - [0.9990543735224586, 0.9794319294809011, 0.9798285426122038]
+# 20  epochs - [0.9995271867612293, 0.9779627815866797, 0.9798285426122038]
+# 80  epochs - [0.9995271867612293, 0.975024485798237,  0.9803328290468987]
+# 300 epochs - [0.9995271867612293, 0.9760039177277179, 0.983358547655068]
+# 300 epochs - swap order of tasks to 8 0 2 - [0.9813414019162885, 0.9995271867612293, 0.9769833496571988]
 
 # Run vanilla VCL
 tf.reset_default_graph()
@@ -86,5 +76,5 @@ np.random.seed(1)
 
 coreset_size = 0
 data_gen = SplitMnistGenerator()
-vcl_result = vcl.run_vcl_shared_ml(hidden_size, no_epochs, data_gen,
+vcl_result = vcl.run_vcl_shared_vi(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size)
