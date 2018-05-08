@@ -1,5 +1,3 @@
-import matplotlib
-
 #matplotlib.use('Agg')
 import numpy as np
 import matplotlib
@@ -338,97 +336,103 @@ def visualise_weights_epoch(no_hiddens=256, epoch_pause = [20, 40, 100, 120], pa
     #fig3.savefig('/tmp/lower_var_2.pdf')
 
 
-def check_weight_pruning(no_hiddens=256, path=""):
-    res_0 = np.load(path + 'weights_0.npz')
+def check_weight_pruning(no_hiddens=[256], no_tasks = 3, no_classifiers=10, path=""):
+    res_0 = np.load(path + 'weights_vi_batch_permuted_1000.npz')
     lower_0 = res_0['lower']
     upper_0 = res_0['upper']
-
-    res_1 = np.load(path + 'weights_1.npz')
-    lower_1 = res_1['lower']
-    upper_1 = res_1['upper']
 
     m0 = lower_0[0, :]
     v0 = np.exp(lower_0[1, :])
 
-    m1 = lower_1[0, :]
-    v1 = np.exp(lower_1[1, :])
+    # mu1 = means, upper layer, after task 1
+    mu1 = upper_0[0][0]
+    vu1 = np.exp(upper_0[0][1])
 
-    m2 = upper_0[0, :]
-    v2 = np.exp(upper_0[1, :])
+    mu2 = upper_0[0][0]
+    vu2 = np.exp(upper_0[0][1])
 
-    m3 = upper_1[0, :]
-    v3 = np.exp(upper_1[1, :])
+    mu3 = upper_0[0][0]
+    vu3 = np.exp(upper_0[0][1])
 
+    # ml1 = means, lower layers, 1st (lowest) layer
     in_dim = 784
     in_size = [28, 28]
-    no_params = in_dim * no_hiddens
-    m0 = m0[:no_params].reshape([in_dim, no_hiddens])
-    v0 = v0[:no_params].reshape([in_dim, no_hiddens])
-    m1 = m1[:no_params].reshape([in_dim, no_hiddens])
-    v1 = v1[:no_params].reshape([in_dim, no_hiddens])
+    no_params = in_dim * no_hiddens[0]
+    ml1 = m0[:no_params].reshape([in_dim, no_hiddens[0]])
+    vl1 = v0[:no_params].reshape([in_dim, no_hiddens[0]])
+    param_index = no_params + no_hiddens[0]
+    no_params = no_hiddens[0] * no_hiddens[1]
+    ml2 = m0[param_index:param_index+no_params].reshape([no_hiddens[0], no_hiddens[1]])
+    vl2 = v0[param_index:param_index+no_params].reshape([no_hiddens[0], no_hiddens[1]])
 
-    no_params = no_hiddens * 2
-    m2 = m2[:no_params].reshape([no_hiddens, 2])
-    v2 = v2[:no_params].reshape([no_hiddens, 2])
-    m3 = m3[:no_params].reshape([no_hiddens, 2])
-    v3 = v3[:no_params].reshape([no_hiddens, 2])
-
-
-    print np.argmax(np.abs(m3),0)
-    print m3[np.argmax(np.abs(m3),0)]
-    print m2[np.argmax(np.abs(m3),0)]
-
-    """
-    print np.max(m2)
-    print np.min(m2)
-    print np.max(m3)
-    print np.min(m3)
-    print np.max(v2)
-    print np.min(v2)
-    print np.max(v3)
-    print np.min(v3)
-    print v2[54:57]
-    print v2[62:65]
+    no_params = no_hiddens[-1] * no_classifiers
+    mu1 = mu1[:no_params].reshape([no_hiddens[-1], no_classifiers])
+    vu1 = vu1[:no_params].reshape([no_hiddens[-1], no_classifiers])
+    mu2 = mu2[:no_params].reshape([no_hiddens[-1], no_classifiers])
+    vu2 = vu2[:no_params].reshape([no_hiddens[-1], no_classifiers])
+    mu3 = mu3[:no_params].reshape([no_hiddens[-1], no_classifiers])
+    vu3 = vu3[:no_params].reshape([no_hiddens[-1], no_classifiers])
 
 
-    # task 1
-    x = np.linspace(-2, 2, 100)
-    lims = 10
-    for i in range(lims):
-        print i
-        fig, axs = plt.subplots(2, 1)
-        lower_i_mean = m0[:, i]
-        lower_i_var = v0[:, i]
-        upper_i_mean = m2[i, :]
-        upper_i_var = v2[i, :]
-        for k in range(in_dim):
-            axs[1].plot(x, mlab.normpdf(x, lower_i_mean[k], np.sqrt(lower_i_var[k])))
-        for k in range(2):
-            axs[0].plot(x, mlab.normpdf(x, upper_i_mean[k], np.sqrt(upper_i_var[k])))
+    neuron = 82
+    print np.max(mu3[neuron,:])
+    print np.min(mu3[neuron,:])
 
-        plt.savefig('/tmp/task_1_unit_%d.pdf' % i)
+    print np.max(vu3[neuron,:])
+    print np.min(vu3[neuron,:])
+
+    print mu3[neuron,:]
+    print vu3[neuron,:]
 
     x = np.linspace(-2, 2, 100)
-    for i in range(lims):
-        print i
-        fig, axs = plt.subplots(2, 1)
-        lower_i_mean = m1[:, i]
-        lower_i_var = v1[:, i]
-        upper_i_mean = m3[i, :]
-        upper_i_var = v3[i, :]
-        for k in range(in_dim):
-            axs[1].plot(x, mlab.normpdf(x, lower_i_mean[k], np.sqrt(lower_i_var[k])))
-        for k in range(2):
-            axs[0].plot(x, mlab.normpdf(x, upper_i_mean[k], np.sqrt(upper_i_var[k])))
 
-        plt.savefig('/tmp/task_2_unit_%d.pdf' % i)
     """
+    lims = no_hiddens[0]
+    for i in range(lims):
+        plt.figure(i+1)
+        print i
+        lower1_i_mean = ml1[:, i]
+        lower1_i_var = vl1[:, i]
+        lower2_i_mean = ml2[i,:]
+        lower2_i_var = vl2[i,:]
+        for k in range(lower1_i_mean.size):
+            plt.subplot(212)
+            plt.plot(x, mlab.normpdf(x, lower1_i_mean[k], np.sqrt(lower1_i_var[k])))
+        for k in range(lower2_i_mean.size):
+            plt.subplot(211)
+            plt.plot(x, mlab.normpdf(x, lower2_i_mean[k], np.sqrt(lower2_i_var[k])))
+
+        plt.savefig('tmp2/lower/task_3_lower_unit_%d.pdf' % i)
+    
+    
+    lims = no_hiddens[-1]
+    for i in range(lims):
+        plt.figure(no_hiddens[0]+i+1)
+        print i
+        lower_i_mean = ml2[:, i]
+        lower_i_var = vl2[:, i]
+        upper_i_mean = mu3[i, :]
+        upper_i_var = vu3[i, :]
+        for k in range(lower_i_mean.size):
+            plt.subplot(212)
+            plt.plot(x, mlab.normpdf(x, lower_i_mean[k], np.sqrt(lower_i_var[k])))
+        for k in range(upper_i_mean.size):
+            plt.subplot(211)
+            plt.plot(x, mlab.normpdf(x, upper_i_mean[k], np.sqrt(upper_i_var[k])))
+            plt.ylim(0, 2.0)
+
+        plt.savefig('tmp2/upper/task_3_upper_unit_%d.pdf' % i)
+    """
+
+
 
 if __name__ == "__main__":
     epoch_pause = [20, 80, 140, 142, 144, 146, 148, 150]
-    no_hiddens = 256
+    no_hiddens = [100, 100]
+    no_tasks = 3
+    no_classifiers = 10
     # check_weight_pruning(path='small_init/')
-    visualise_weights(no_hiddens)
-    # check_weight_pruning(no_hiddens)
+    # visualise_weights(no_hiddens)
+    check_weight_pruning(no_hiddens, no_tasks, no_classifiers)
     # visualise_weights_epoch(no_hiddens,epoch_pause)
     # visualise_weights_vi_batch(no_hiddens)

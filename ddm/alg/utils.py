@@ -11,7 +11,7 @@ def merge_coresets(x_coresets, y_coresets):
         merged_y = np.vstack((merged_y, y_coresets[i]))
     return merged_x, merged_y
 
-def get_scores(model, x_testsets, y_testsets, x_coresets, y_coresets, hidden_size, no_epochs, single_head, batch_size=None):
+def get_scores(model, x_testsets, y_testsets, x_coresets, y_coresets, hidden_size, no_epochs, single_head, batch_size=None, no_repeats=1):
     mf_weights, mf_variances = model.get_weights()
     acc = []
 
@@ -38,6 +38,9 @@ def get_scores(model, x_testsets, y_testsets, x_coresets, y_coresets, hidden_siz
         x_test, y_test = x_testsets[i], y_testsets[i]
 
         pred = final_model.prediction_prob(x_test, head)
+        for j in range(no_repeats-1):
+            pred = pred + final_model.prediction_prob(x_test, head)
+        #pred = pred / (1.0*no_repeats)
         pred_mean = np.mean(pred, axis=0)
         pred_y = np.argmax(pred_mean, axis=1)
         y = np.argmax(y_test, axis=1)

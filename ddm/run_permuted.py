@@ -50,9 +50,9 @@ class PermutedMnistGenerator():
 
 hidden_size = [100, 100]
 batch_size = 256
-no_epochs = 100
+no_epochs = 300
 single_head = True
-num_tasks = 5
+num_tasks = 3
 
 # Run vanilla VCL
 tf.set_random_seed(12)
@@ -63,7 +63,7 @@ data_gen = PermutedMnistGenerator(num_tasks)
 vcl_result = vcl.run_vcl(hidden_size, no_epochs, data_gen, 
     coreset.rand_from_batch, coreset_size, batch_size, single_head)
 print vcl_result
-
+"""
 # Run random coreset VCL
 tf.reset_default_graph()
 tf.set_random_seed(12)
@@ -90,3 +90,4 @@ vcl_avg = np.nanmean(vcl_result, 1)
 rand_vcl_avg = np.nanmean(rand_vcl_result, 1)
 kcen_vcl_avg = np.nanmean(kcen_vcl_result, 1)
 utils.plot('results/permuted.jpg', vcl_avg, rand_vcl_avg, kcen_vcl_avg)
+"""

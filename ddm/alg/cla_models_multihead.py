@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np
 from copy import deepcopy
 
-np.random.seed(0)
-tf.set_random_seed(0)
+#np.random.seed(0)
+#tf.set_random_seed(0)
 
 # variable initialization functions
 def weight_variable(shape, init_weights=None):
@@ -51,6 +51,9 @@ class Cla_NN(object):
     def assign_optimizer(self, learning_rate=0.001):
         self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
 
+    def assign_optimizer_upper_weights(self, learning_rate=0.001):
+        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.cost, var_list=[self.W_last,self.b_last])
+
     def assign_session(self):
         # Initializing the variables
         init = tf.global_variables_initializer()
@@ -59,7 +62,7 @@ class Cla_NN(object):
         self.sess = tf.Session()
         self.sess.run(init)
 
-    def train(self, x_train, y_train, task_idx, no_epochs=1000, batch_size=100, display_epoch=5):
+    def train(self, x_train, y_train, task_idx, no_epochs=1000, batch_size=100, display_epoch=50):
         N = x_train.shape[0]
         if batch_size > N:
             batch_size = N
@@ -142,6 +145,7 @@ class Vanilla_NN(Cla_NN):
         return log_lik
 
     def create_weights(self, in_dim, hidden_size, out_dim, prev_weights):
+        #tf.set_random_seed(3)
         hidden_size = deepcopy(hidden_size)
         hidden_size.append(out_dim)
         hidden_size.insert(0, in_dim)
@@ -185,15 +189,92 @@ class Vanilla_NN(Cla_NN):
         bi = tf.Variable(bi_val)
         W_last.append(Wi)
         b_last.append(bi)
-            
+
+        return W, b, W_last, b_last, hidden_size
+
+""" Neural Network Model, only training head weights """
+class Vanilla_NN_upper_weights(Cla_NN):
+    def __init__(self, input_size, hidden_size, output_size, training_size, prev_weights=None, learning_rate=0.001):
+
+        super(Vanilla_NN_upper_weights, self).__init__(input_size, hidden_size, output_size, training_size)
+        # init weights and biases
+        self.W, self.b, self.W_last, self.b_last, self.size = self.create_weights(
+                input_size, hidden_size, output_size, prev_weights)
+        self.no_layers = len(hidden_size) + 1
+        self.pred = self._prediction(self.x, self.task_idx)
+        self.cost = - self._logpred(self.x, self.y, self.task_idx)
+        self.weights = [self.W, self.b, self.W_last, self.b_last]
+
+        self.assign_optimizer_upper_weights(learning_rate)
+        self.assign_session()
+
+    def _prediction(self, inputs, task_idx):
+        act = inputs
+        for i in range(self.no_layers-1):
+            pre = tf.add(tf.matmul(act, self.W[i]), self.b[i])
+            act = tf.nn.relu(pre)
+        pre = tf.add(tf.matmul(act, tf.gather(self.W_last, task_idx)), tf.gather(self.b_last, task_idx))
+        return pre
+
+    def _logpred(self, inputs, targets, task_idx):
+        pred = self._prediction(inputs, task_idx)
+        log_lik = - tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=targets))
+        return log_lik
+
+    def create_weights(self, in_dim, hidden_size, out_dim, prev_weights):
+        #tf.set_random_seed(3)
+        hidden_size = deepcopy(hidden_size)
+        hidden_size.append(out_dim)
+        hidden_size.insert(0, in_dim)
+        no_params = 0
+        no_layers = len(hidden_size) - 1
+        W = []
+        b = []
+        W_last = []
+        b_last = []
+        for i in range(no_layers-1):
+            din = hidden_size[i]
+            dout = hidden_size[i+1]
+            if prev_weights is None:
+                Wi_val = tf.truncated_normal([din, dout], stddev=0.1)
+                bi_val = tf.truncated_normal([dout], stddev=0.1)
+            else:
+                Wi_val = tf.constant(prev_weights[0][i])
+                bi_val = tf.constant(prev_weights[1][i])
+            Wi = tf.Variable(Wi_val)
+            bi = tf.Variable(bi_val)
+            W.append(Wi)
+            b.append(bi)
+
+        if prev_weights is not None:
+            prev_Wlast = prev_weights[2]
+            prev_blast = prev_weights[3]
+            no_prev_tasks = len(prev_Wlast)
+            for j in range(no_prev_tasks):
+                W_j = prev_Wlast[j]
+                b_j = prev_blast[j]
+                Wi = tf.Variable(W_j)
+                bi = tf.Variable(b_j)
+                W_last.append(Wi)
+                b_last.append(bi)
+
+        din = hidden_size[-2]
+        dout = hidden_size[-1]
+        Wi_val = tf.truncated_normal([din, dout], stddev=0.1)
+        bi_val = tf.truncated_normal([dout], stddev=0.1)
+        Wi = tf.Variable(Wi_val)
+        bi = tf.Variable(bi_val)
+        W_last.append(Wi)
+        b_last.append(bi)
+
         return W, b, W_last, b_last, hidden_size
 
 
 """ Bayesian Neural Network with Mean field VI approximation """
 class MFVI_NN(Cla_NN):
     def __init__(self, input_size, hidden_size, output_size, training_size, 
-        no_train_samples=10, no_pred_samples=100, prev_means=None, prev_log_variances=None, learning_rate=0.001, 
-        prior_mean=0, prior_var=1):
+        no_train_samples=10, no_pred_samples=100, prev_means=None, prev_log_variances=None, learning_rate=0.001,
+        prior_mean=0.0, prior_var=1.0):
 
         super(MFVI_NN, self).__init__(input_size, hidden_size, output_size, training_size)
         m, v, self.size = self.create_weights(
@@ -294,6 +375,11 @@ class MFVI_NN(Cla_NN):
         return kl
 
     def create_weights(self, in_dim, hidden_size, out_dim, prev_weights, prev_variances):
+        #tf.set_random_seed(3)
+
+        m_std = 0.1
+        W_v_log = -6.0
+        b_v_log = -6.0
         hidden_size = deepcopy(hidden_size)
         hidden_size.append(out_dim)
         hidden_size.insert(0, in_dim)
@@ -311,16 +397,17 @@ class MFVI_NN(Cla_NN):
             din = hidden_size[i]
             dout = hidden_size[i+1]
             if prev_weights is None:
-                Wi_m_val = tf.truncated_normal([din, dout], stddev=0.1)
-                bi_m_val = tf.truncated_normal([dout], stddev=0.1)
-                Wi_v_val = tf.constant(-6.0, shape=[din, dout])
-                bi_v_val = tf.constant(-6.0, shape=[dout])
+                Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
+                bi_m_val = tf.truncated_normal([dout], stddev=m_std)
+                Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+                bi_v_val = tf.constant(b_v_log, shape=[dout])
             else:
                 Wi_m_val = prev_weights[0][i]
                 bi_m_val = prev_weights[1][i]
                 if prev_variances is None:
-                    Wi_v_val = tf.constant(-6.0, shape=[din, dout])
-                    bi_v_val = tf.constant(-6.0, shape=[dout])
+                    #W_v_log = np.log(2.0 / (din + dout), dtype=np.float32)
+                    Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+                    bi_v_val = tf.constant(b_v_log, shape=[dout])
                 else:
                     Wi_v_val = prev_variances[0][i]
                     bi_v_val = prev_variances[1][i]
@@ -365,10 +452,10 @@ class MFVI_NN(Cla_NN):
             Wi_m_val = prev_weights[2][0]
             bi_m_val = prev_weights[3][0]
         else:
-            Wi_m_val = tf.truncated_normal([din, dout], stddev=0.1)
-            bi_m_val = tf.truncated_normal([dout], stddev=0.1)
-        Wi_v_val = tf.constant(-6.0, shape=[din, dout])
-        bi_v_val = tf.constant(-6.0, shape=[dout])
+            Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
+            bi_m_val = tf.truncated_normal([dout], stddev=m_std)
+        Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+        bi_v_val = tf.constant(b_v_log, shape=[dout])
 
         Wi_m = tf.Variable(Wi_m_val)
         bi_m = tf.Variable(bi_m_val)
@@ -378,7 +465,7 @@ class MFVI_NN(Cla_NN):
         b_last_m.append(bi_m)
         W_last_v.append(Wi_v)
         b_last_v.append(bi_v)
-            
+
         return [W_m, b_m, W_last_m, b_last_m], [W_v, b_v, W_last_v, b_last_v], hidden_size
 
     def create_prior(self, in_dim, hidden_size, out_dim, prev_weights, prev_variances, prior_mean, prior_var):

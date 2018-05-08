@@ -101,13 +101,15 @@ def init_post(cav_info, init_using_cav, ml_weights=None):
         if ml_weights:
             post_mean = ml_weights[0]
         else:
-            post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
-        post_var = np.ones_like(cav_var) * np.exp(-6.0)
+            #post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
+            post_mean = np.zeros(cav_mean.shape)
+        #post_var = np.ones_like(cav_var) * np.exp(-6.0)
+        post_var = np.ones_like(cav_var) / 128
         return [post_mean, post_var]
 
 
 def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
-                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.005):
+                   coreset_size=0, batch_size=None, ml_init_option=False, no_iters=1, learning_rate=0.005):
     in_dim, out_dim = data_gen.get_dims()
     x_coresets, y_coresets = [], []
     x_testsets, y_testsets = [], []
@@ -164,17 +166,19 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                 ## different init here, use one but it seems ml solution gives
                 ## faster convergence
 
-                ## init using the maximum likeihood solution + small variances
-                # ml_model.init_session(task_id, learning_rate=0.002)
-                #ml_model.train(x_train, y_train, task_id,
-                #               no_epochs=50, batch_size=bsize)
-                #ml_lower, ml_upper = ml_model.get_weights(task_id)
-                #lower_post = init_post(lower_mv, init_using_cav=False, ml_weights=ml_lower)
-                #upper_post = init_post(upper_mv, init_using_cav=False, ml_weights=ml_upper)
+                if ml_init_option:
+                    ## init using the maximum likeihood solution + small variances
+                    ml_model.init_session(task_id, learning_rate=0.002)
+                    ml_model.train(x_train, y_train, task_id,
+                                   no_epochs=100, batch_size=bsize)
+                    ml_lower, ml_upper = ml_model.get_weights(task_id)
+                    lower_post = init_post(lower_mv, init_using_cav=False, ml_weights=ml_lower)
+                    upper_post = init_post(upper_mv, init_using_cav=False, ml_weights=ml_upper)
 
-                ## init using random means + small variances
-                lower_post = init_post(lower_mv, init_using_cav=False)
-                upper_post = init_post(upper_mv, init_using_cav=False)
+                else:
+                    # init using random means + small variances
+                    lower_post = init_post(lower_mv, init_using_cav=False)
+                    upper_post = init_post(upper_mv, init_using_cav=False)
 
                 ## init using the prior or cavity
                 # lower_post = init_post(lower_mv, init_using_cav=True)

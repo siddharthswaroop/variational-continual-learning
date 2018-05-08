@@ -134,14 +134,14 @@ class ML_NN(object):
         self.sess.close()
 
     def train(self, x_train, y_train, no_tasks,
-              no_epochs=1000, batch_size=100, display_epoch=5):
+              no_epochs=1000, batch_size=None, display_epoch=5):
 
         sess = self.sess
         costs = []
         feed_dict = {}
 
         # Batch training: only train on smallest dataset size
-        Nmin = min([x_train[task_id].shape[0] for task_id in range(no_tasks)])
+        # Nmin = min([x_train[task_id].shape[0] for task_id in range(no_tasks)])
 
         # Training cycle
         for epoch in range(no_epochs):
@@ -159,17 +159,27 @@ class ML_NN(object):
                 y_train_interm = y_train[task_id]
                 cur_x_train.append(x_train_interm[perm_inds])
                 cur_y_train.append(y_train_interm[perm_inds])
-
-            N = Nmin
-            avg_cost = 0.
-            total_batch = int(np.ceil(N * 1.0 / batch_size))
-            # Loop over all batches
-            for i in range(total_batch):
-                start_ind = i * batch_size
-                end_ind = np.min([(i + 1) * batch_size, N])
-                for task_id in range(no_tasks):
+                if batch_size == None:
+                    start_ind = 0
+                    end_ind = N
                     feed_dict[self.x[task_id]] = cur_x_train[task_id][start_ind:end_ind, :]
                     feed_dict[self.ys[task_id]] = cur_y_train[task_id][start_ind:end_ind, :]
+
+            # N = Nmin
+            if batch_size == None:
+                total_batch = 1
+            else:
+                total_batch = int(np.ceil(N * 1.0 / batch_size))
+
+            avg_cost = 0.
+            # Loop over all batches
+            for i in range(total_batch):
+                if batch_size != None:
+                    start_ind = i * batch_size
+                    end_ind = np.min([(i + 1) * batch_size, N])
+                    for task_id in range(no_tasks):
+                        feed_dict[self.x[task_id]] = cur_x_train[task_id][start_ind:end_ind, :]
+                        feed_dict[self.ys[task_id]] = cur_y_train[task_id][start_ind:end_ind, :]
                 # Run optimization op (backprop) and cost op (to get loss value)
                 _, c = sess.run(
                     [self.train_step, self.costs],
@@ -292,7 +302,8 @@ class MFVI_NN(object):
         self.ys = [
             tf.placeholder(tf.float32, [None, upper_size[-1]])
             for upper_size in upper_sizes]
-        self.training_size = tf.placeholder(tf.int32)
+        self.training_size = [
+            tf.placeholder(tf.int32) for upper_size in upper_sizes]
 
         self.lower_net = HalfNet(lower_size)
         self.upper_nets = []
@@ -306,8 +317,8 @@ class MFVI_NN(object):
         kl_lower = self.lower_net.KL_term()
         #costs = []
         costs = 0.0
-        N = tf.cast(self.training_size, tf.float32)
         for t, upper_net in enumerate(self.upper_nets):
+            N = tf.cast(self.training_size[t], tf.float32)
             kl_upper = upper_net.KL_term()
             log_pred = self.log_prediction_fn(
                 self.x[t], self.ys[t], t, self.no_train_samples)
@@ -352,14 +363,13 @@ class MFVI_NN(object):
               no_epochs=1000, batch_size=100, display_epoch=5):
 
         # Batch training: only train on smallest dataset size
-        Nmin = min([x_train[task_id].shape[0] for task_id in range(no_tasks)])
+        # Nmin = min([x_train[task_id].shape[0] for task_id in range(no_tasks)])
 
         sess = self.sess
         costs = []
         feed_dict = {
             self.lower_net.m0: prior_lower[0],
-            self.lower_net.v0: prior_lower[1],
-            self.training_size: Nmin}
+            self.lower_net.v0: prior_lower[1]}
 
 
         # Training cycle
@@ -380,17 +390,28 @@ class MFVI_NN(object):
                 cur_y_train.append(y_train_interm[perm_inds])
                 feed_dict[self.upper_nets[task_id].m0] = prior_upper[0]
                 feed_dict[self.upper_nets[task_id].v0] = prior_upper[1]
-
-            N = Nmin
-            avg_cost = 0.
-            total_batch = int(np.ceil(N * 1.0 / batch_size))
-            # Loop over all batches
-            for i in range(total_batch):
-                start_ind = i * batch_size
-                end_ind = np.min([(i + 1) * batch_size, N])
-                for task_id in range(no_tasks):
+                feed_dict[self.training_size[task_id]] = N
+                if batch_size == None:
+                    start_ind = 0
+                    end_ind = N
                     feed_dict[self.x[task_id]] = cur_x_train[task_id][start_ind:end_ind, :]
                     feed_dict[self.ys[task_id]] = cur_y_train[task_id][start_ind:end_ind, :]
+
+            #N = Nmin
+            if batch_size == None:
+                total_batch = 1
+            else:
+                total_batch = int(np.ceil(N * 1.0 / batch_size))
+
+            avg_cost = 0.
+            # Loop over all batches
+            for i in range(total_batch):
+                if batch_size != None:
+                    start_ind = i * batch_size
+                    end_ind = np.min([(i + 1) * batch_size, N])
+                    for task_id in range(no_tasks):
+                        feed_dict[self.x[task_id]] = cur_x_train[task_id][start_ind:end_ind, :]
+                        feed_dict[self.ys[task_id]] = cur_y_train[task_id][start_ind:end_ind, :]
                 # Run optimization op (backprop) and cost op (to get loss value)
                 _, c = sess.run(
                     [self.train_step, self.costs],

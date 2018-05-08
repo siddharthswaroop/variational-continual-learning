@@ -107,7 +107,7 @@ def init_post(cav_info, init_using_cav, ml_weights=None):
 
 
 def run_vcl_shared_ml(hidden_size, no_epochs, data_gen, coreset_method,
-                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.005):
+                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.001):
     in_dim, out_dim = data_gen.get_dims()
     x_coresets, y_coresets = [], []
     x_testsets, y_testsets = [], []
@@ -134,12 +134,12 @@ def run_vcl_shared_ml(hidden_size, no_epochs, data_gen, coreset_method,
     # get data
     x_train, y_train = x_trainsets[0], y_trainsets[0]
     x_test, y_test = x_testsets[0], y_testsets[0]
-    bsize = x_train.shape[0] if (batch_size is None) else batch_size
+    # bsize = x_train.shape[0] if (batch_size is None) else batch_size
 
     ## init using the maximum likeihood solution + small variances
-    ml_model.init_session(learning_rate=0.0005)
+    ml_model.init_session(learning_rate)
     ml_model.train(x_trainsets, y_trainsets, no_tasks,
-                   no_epochs, batch_size=bsize)
+                   no_epochs, batch_size=batch_size)
 
     upper_post = []
     for task_id in range(no_tasks):
@@ -164,7 +164,7 @@ def run_vcl_shared_ml(hidden_size, no_epochs, data_gen, coreset_method,
 
 
 def run_vcl_shared_vi(hidden_size, no_epochs, data_gen, coreset_method,
-                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.005):
+                   coreset_size=0, batch_size=None, no_iters=1, learning_rate=0.001):
     in_dim, out_dim = data_gen.get_dims()
     x_coresets, y_coresets = [], []
     x_testsets, y_testsets = [], []
@@ -192,7 +192,7 @@ def run_vcl_shared_vi(hidden_size, no_epochs, data_gen, coreset_method,
     # get data
     x_train, y_train = x_trainsets[0], y_trainsets[0]
     x_test, y_test = x_testsets[0], y_testsets[0]
-    bsize = x_train.shape[0] if (batch_size is None) else batch_size
+    # bsize = x_train.shape[0] if (batch_size is None) else batch_size
 
     ## init using random means + small variances
     model.init_session(learning_rate)
@@ -218,7 +218,7 @@ def run_vcl_shared_vi(hidden_size, no_epochs, data_gen, coreset_method,
     model.assign_weights(
         range(no_tasks), lower_post, upper_post, lower_transform, upper_transform)
 
-    model.train(x_trainsets, y_trainsets, no_tasks, lower_mv, upper_mv, no_epochs, bsize)
+    model.train(x_trainsets, y_trainsets, no_tasks, lower_mv, upper_mv, no_epochs, batch_size)
 
     upper_post = []
     for task_id in range(no_tasks):

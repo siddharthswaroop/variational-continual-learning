@@ -9,6 +9,10 @@ import coreset
 import utils
 from copy import deepcopy
 
+#config = tf.ConfigProto()
+#config.gpu_options.allow_growth=True
+#sess = tf.Session(config=config)
+
 class SplitMnistGenerator():
     def __init__(self):
         f = gzip.open('data/mnist.pkl.gz', 'rb')
@@ -20,8 +24,10 @@ class SplitMnistGenerator():
         self.train_label = np.hstack((train_set[1], valid_set[1]))
         self.test_label = test_set[1]
 
-        self.sets_0 = [0, 2, 4, 6, 8]
-        self.sets_1 = [1, 3, 5, 7, 9]
+        #self.sets_0 = [0, 2, 4, 6, 8]
+        #self.sets_1 = [1, 3, 5, 7, 9]
+        self.sets_0 = [2,4]
+        self.sets_1 = [3,5]
         self.max_iter = len(self.sets_0)
         self.cur_iter = 0
 
@@ -53,21 +59,49 @@ class SplitMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
-hidden_size = [256, 256]
+hidden_size = [256]
 batch_size = None
-no_epochs = 120
+no_epochs = 10000
 single_head = False
+ml_init = False
+
+
+
+#for i in range(5):
+
+i=2
+
+print i
 
 # Run vanilla VCL
-tf.set_random_seed(12)
+tf.set_random_seed(10+i)
 np.random.seed(1)
 
 coreset_size = 0
 data_gen = SplitMnistGenerator()
-vcl_result = vcl.run_vcl(hidden_size, no_epochs, data_gen, 
-    coreset.rand_from_batch, coreset_size, batch_size, single_head)
-print vcl_result
+vcl_result = vcl.run_vcl(hidden_size, no_epochs, data_gen,
+    coreset.rand_from_batch, coreset_size, batch_size, single_head, ml_init=ml_init)
 
+    #tf.set_random_seed(4) # Testing random seed
+    #data_gen2 = SplitMnistGenerator()
+    #vcl_result = vcl.vcl_predictions(hidden_size, no_epochs, data_gen2,
+    #    coreset.rand_from_batch, coreset_size, batch_size, single_head, ml_init=ml_init, no_pred_repeats=1)
+
+    #if i == 0:
+    #    vcl_avg = vcl_result
+    #else:
+    #    vcl_avg = vcl_avg+vcl_result
+
+#vcl_result = vcl_avg/5.0
+
+# Print in a suitable format
+for task_id in range(data_gen.max_iter):
+    for i in range(task_id + 1):
+        print vcl_result[task_id][i],
+    print ''
+
+#print vcl_result
+"""
 # Run random coreset VCL
 tf.reset_default_graph()
 tf.set_random_seed(12)
@@ -94,3 +128,4 @@ vcl_avg = np.nanmean(vcl_result, 1)
 rand_vcl_avg = np.nanmean(rand_vcl_result, 1)
 kcen_vcl_avg = np.nanmean(kcen_vcl_result, 1)
 utils.plot('results/split.jpg', vcl_avg, rand_vcl_avg, kcen_vcl_avg)
+"""
