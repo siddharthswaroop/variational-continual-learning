@@ -103,8 +103,8 @@ def init_post(cav_info, init_using_cav, ml_weights=None):
         else:
             #post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
             post_mean = np.zeros(cav_mean.shape)
-        #post_var = np.ones_like(cav_var) * np.exp(-6.0)
-        post_var = np.ones_like(cav_var) / 128
+        post_var = np.ones_like(cav_var) * np.exp(-6.0)
+        #post_var = np.ones_like(cav_var) / 128
         return [post_mean, post_var]
 
 
@@ -195,6 +195,12 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             else:
                 upper_transform = ide_func
                 lower_transform = ide_func
+
+            lower_post = init_post(lower_mv, init_using_cav=False)
+            upper_post = init_post(upper_mv, init_using_cav=False)
+            upper_transform = log_func
+            lower_transform = log_func
+
             model.assign_weights(
                 task_id, lower_post, upper_post, lower_transform, upper_transform)
             # train on non-coreset data
@@ -234,7 +240,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                                           data_factor=False, core_factor=True)
 
         np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
-        np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
+        #np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
 
         # Make prediction
         lower_post, upper_post = factory.compute_dist(
@@ -248,11 +254,17 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             all_acc = np.array(acc)
         else:
             all_acc = np.vstack([all_acc, acc])
-        print acc
+        #print acc
         print all_acc
 
         # all_acc = utils.concatenate_results(acc, all_acc)
         # pdb.set_trace()
         model.close_session()
+
+    # Print in a suitable format
+    for task_id in range(data_gen.max_iter):
+        for i in range(task_id+1):
+            print all_acc[task_id][i],
+        print ''
 
     return all_acc

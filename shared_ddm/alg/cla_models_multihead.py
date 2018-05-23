@@ -444,7 +444,7 @@ class MFVI_NN(object):
 
 
 class HalfNet():
-    def __init__(self, size, act_func=tf.nn.tanh):
+    def __init__(self, size, act_func=tf.nn.relu):
         self.size = size
         self.no_layers = len(size) - 1
         self.act_func = act_func
@@ -472,12 +472,11 @@ class HalfNet():
         act = inputs
         for i in range(self.no_layers):
             m_pre = tf.einsum('kni,io->kno', act, mw[i])
+            m_pre = m_pre + mb[i]
             v_pre = tf.einsum('kni,io->kno', act ** 2.0, tf.exp(vw[i]))
-            eps_w = tf.random_normal([K, N, self.size[i + 1]], 0.0, 1.0, dtype=tf.float32)
-            pre_W = eps_w * tf.sqrt(1e-9 + v_pre) + m_pre
-            eps_b = tf.random_normal([K, 1, self.size[i + 1]], 0.0, 1.0, dtype=tf.float32)
-            pre_b = eps_b * tf.exp(0.5 * vb[i]) + mb[i]
-            pre = pre_W + pre_b
+            v_pre = v_pre + tf.exp(vb[i])
+            eps = tf.random_normal([K, N, self.size[i + 1]], 0.0, 1.0, dtype=tf.float32)
+            pre = eps * tf.sqrt(1e-9 + v_pre) + m_pre
             act = self.act_func(pre)
         pre = tf.reshape(pre, [K, N, Dout])
         return pre

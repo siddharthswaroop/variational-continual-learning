@@ -96,50 +96,69 @@ class PermutedMnistGenerator():
             return next_x_train, next_y_train, next_x_test, next_y_test
 
 
+vcl_avg = None
+for i in range(5):
 
-hidden_size = [256]
-batch_size = 256
-no_epochs = 300
-no_iters = 1
-coreset_size = 0
-ml_init = False
+    hidden_size = [256]
+    batch_size = 256
+    no_epochs = 300
+    no_iters = 1
 
-# Run vanilla VCL
-tf.reset_default_graph()
-tf.set_random_seed(12)
-np.random.seed(1)
+    ml_init = False
 
-option = 1
+    # Run vanilla VCL
+    tf.reset_default_graph()
+    tf.set_random_seed(10+i)
+    np.random.seed(10+i)
 
-#if len(sys.argv) == 2:
-#    option = int(sys.argv[1])
-#else:
-#    option = 4
+    option = 1
 
-if option == 1:
-    coreset_size = 0
-    data_gen = SplitMnistGenerator()
-    vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-        coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters)
-    # print vcl_result
-    #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+    #if len(sys.argv) == 2:
+    #    option = int(sys.argv[1])
+    #else:
+    #    option = 4
 
-elif option == 2:
-    # Run random coreset VCL
-    data_gen = SplitMnistGenerator()
-    rand_vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-        coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters)
-    print rand_vcl_result
-    #pickle.dump(rand_vcl_result, open('results/rand_vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+    if option == 1:
+        coreset_size = 0
+        data_gen = SplitMnistGenerator()
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters)
+        # print vcl_result
+        #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+
+    elif option == 2:
+        # Run random coreset VCL
+        coreset_size = 40
+        data_gen = SplitMnistGenerator()
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters)
+        #print rand_vcl_result
+        #pickle.dump(rand_vcl_result, open('results/rand_vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
 
-elif option == 3:
-    # Run k-center coreset VCL
-    data_gen = SplitMnistGenerator()
-    kcen_vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-        coreset.k_center, coreset_size, batch_size, ml_init, no_iters=no_iters)
-    print kcen_vcl_result
-    #pickle.dump(kcen_vcl_result, open('results/kcen_vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+    elif option == 3:
+        # Run k-center coreset VCL
+        data_gen = SplitMnistGenerator()
+        kcen_vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.k_center, coreset_size, batch_size, ml_init, no_iters=no_iters)
+        print kcen_vcl_result
+        #pickle.dump(kcen_vcl_result, open('results/kcen_vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+
+
+    if vcl_avg is None:
+        vcl_avg = vcl_result
+    else:
+        vcl_avg = vcl_avg+vcl_result
+
+vcl_result = vcl_avg/5.0
+
+# Print in a suitable format
+for task_id in range(data_gen.max_iter):
+    for i in range(task_id + 1):
+        print vcl_result[task_id][i],
+    print ''
+
+
 
 
 # # Plot average accuracy

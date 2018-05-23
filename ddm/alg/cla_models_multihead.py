@@ -272,7 +272,7 @@ class Vanilla_NN_upper_weights(Cla_NN):
 
 """ Bayesian Neural Network with Mean field VI approximation """
 class MFVI_NN(Cla_NN):
-    def __init__(self, input_size, hidden_size, output_size, training_size, 
+    def __init__(self, input_size, hidden_size, output_size, training_size,
         no_train_samples=10, no_pred_samples=100, prev_means=None, prev_log_variances=None, learning_rate=0.001,
         prior_mean=0.0, prior_var=1.0):
 
@@ -299,16 +299,65 @@ class MFVI_NN(Cla_NN):
     def _prediction(self, inputs, task_idx, no_samples):
         return self._prediction_layer(inputs, task_idx, no_samples)
 
+    """
+    # this samples a layer at a time, using local reparam trick
+    def _prediction_layer(self, inputs, task_idx, no_samples):
+        K = no_samples
+        act = tf.tile(tf.expand_dims(inputs, 0), [K, 1, 1])
+        N = tf.shape(act)[1]
+        for i in range(self.no_layers-1):
+            m_pre = tf.einsum('kni,io->kno', act, self.W_m[i])
+            m_pre = m_pre + self.b_m[i]
+            v_pre = tf.einsum('kni,io->kno', act ** 2.0, tf.exp(self.W_v[i]))
+            v_pre = v_pre + tf.exp(self.b_v[i])
+            eps = tf.random_normal([K, N, self.size[i + 1]], 0.0, 1.0, dtype=tf.float32)
+            pre = eps * tf.sqrt(1e-9 + v_pre) + m_pre
+            act = tf.nn.relu(pre)
+
+        #dout = self.size[-1]
+        #Wtask_m = tf.gather(self.W_last_m, task_idx)
+        #Wtask_v = tf.gather(self.W_last_v, task_idx)
+        #btask_m = tf.gather(self.b_last_m, task_idx)
+        #btask_v = tf.gather(self.b_last_v, task_idx)
+
+        #m_pre = tf.einsum('kni,io->kno', act, Wtask_m)
+        #m_pre = m_pre + btask_m
+        #v_pre = tf.einsum('kni,io->kno', act ** 2.0, tf.exp(Wtask_v))
+        #v_pre = v_pre + tf.exp(btask_v)
+        #eps = tf.random_normal([K, N, dout], 0.0, 1.0, dtype=tf.float32)
+        #pre = eps * tf.sqrt(1e-9 + v_pre) + m_pre
+        #act = tf.nn.relu(pre)
+
+
+        din = self.size[-2]
+        dout = self.size[-1]
+        eps_w = tf.random_normal((K, din, dout), 0, 1, dtype=tf.float32)
+        eps_b = tf.random_normal((K, 1, dout), 0, 1, dtype=tf.float32)
+
+        Wtask_m = tf.gather(self.W_last_m, task_idx)
+        Wtask_v = tf.gather(self.W_last_v, task_idx)
+        btask_m = tf.gather(self.b_last_m, task_idx)
+        btask_v = tf.gather(self.b_last_v, task_idx)
+        weights = tf.add(tf.multiply(eps_w, tf.exp(0.5*Wtask_v)), Wtask_m)
+        biases = tf.add(tf.multiply(eps_b, tf.exp(0.5*btask_v)), btask_m)
+        act = tf.expand_dims(act, 3)
+        weights = tf.expand_dims(weights, 1)
+        pre = tf.add(tf.reduce_sum(act * weights, 2), biases)
+
+        return pre
+
+    """
+
     # this samples a layer at a time
     def _prediction_layer(self, inputs, task_idx, no_samples):
         K = no_samples
-        act = tf.tile(tf.expand_dims(inputs, 0), [K, 1, 1])        
+        act = tf.tile(tf.expand_dims(inputs, 0), [K, 1, 1])
         for i in range(self.no_layers-1):
             din = self.size[i]
             dout = self.size[i+1]
             eps_w = tf.random_normal((K, din, dout), 0, 1, dtype=tf.float32)
             eps_b = tf.random_normal((K, 1, dout), 0, 1, dtype=tf.float32)
-            
+
             weights = tf.add(tf.multiply(eps_w, tf.exp(0.5*self.W_v[i])), self.W_m[i])
             biases = tf.add(tf.multiply(eps_b, tf.exp(0.5*self.b_v[i])), self.b_m[i])
             pre = tf.add(tf.einsum('mni,mio->mno', act, weights), biases)
@@ -329,6 +378,7 @@ class MFVI_NN(Cla_NN):
         pre = tf.add(tf.reduce_sum(act * weights, 2), biases)
 
         return pre
+
 
     def _logpred(self, inputs, targets, task_idx):
         pred = self._prediction(inputs, task_idx, self.no_train_samples)
