@@ -97,12 +97,18 @@ class PermutedMnistGenerator():
 
 
 vcl_avg = None
-for i in range(5):
+acc_avg = None
+no_repeats = 1
+for i in range(no_repeats):
 
     hidden_size = [256]
     batch_size = 256
-    no_epochs = 300
+    no_epochs = 501
     no_iters = 1
+
+    epoch_pause = range(0, no_epochs, 10)
+    #epoch_pause = []
+    print [x+1 for x in epoch_pause]
 
     ml_init = False
 
@@ -121,8 +127,8 @@ for i in range(5):
     if option == 1:
         coreset_size = 0
         data_gen = SplitMnistGenerator()
-        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters)
+        vcl_result, accuracies = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, no_iters=no_iters, epoch_pause=epoch_pause)
         # print vcl_result
         #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
@@ -149,8 +155,13 @@ for i in range(5):
         vcl_avg = vcl_result
     else:
         vcl_avg = vcl_avg+vcl_result
+    if acc_avg is None:
+        acc_avg = accuracies
+    else:
+        acc_avg = acc_avg+accuracies
 
-vcl_result = vcl_avg/5.0
+vcl_result = vcl_avg/(1.0*no_repeats)
+acc_result = acc_avg/(1.0*no_repeats)
 
 # Print in a suitable format
 for task_id in range(data_gen.max_iter):
@@ -158,7 +169,7 @@ for task_id in range(data_gen.max_iter):
         print vcl_result[task_id][i],
     print ''
 
-
+np.savez('sandbox/smallinitalways/accuracy.npz', acc=acc_result, ind=[x+1 for x in epoch_pause])
 
 
 # # Plot average accuracy

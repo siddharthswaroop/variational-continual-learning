@@ -101,15 +101,15 @@ def init_post(cav_info, init_using_cav, ml_weights=None):
         if ml_weights:
             post_mean = ml_weights[0]
         else:
-            #post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
-            post_mean = np.zeros(cav_mean.shape)
+            post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
+            #post_mean = np.zeros(cav_mean.shape)
         post_var = np.ones_like(cav_var) * np.exp(-6.0)
         #post_var = np.ones_like(cav_var) / 128
         return [post_mean, post_var]
 
 
 def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
-                   coreset_size=0, batch_size=None, ml_init_option=False, no_iters=1, learning_rate=0.005):
+                   coreset_size=0, batch_size=None, ml_init_option=False, no_iters=1, learning_rate=0.005, epoch_pause=[]):
     in_dim, out_dim = data_gen.get_dims()
     x_coresets, y_coresets = [], []
     x_testsets, y_testsets = [], []
@@ -134,6 +134,9 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
     no_upper_weights = [net.no_weights for net in model.upper_nets]
     factory = FactorManager(no_tasks, no_lower_weights, no_upper_weights)
 
+    lower_post_epoch = []
+    upper_post_epoch = []
+    accuracies = []
     for task_id in range(no_tasks):
         # init model
         model.init_session(task_id, learning_rate)
@@ -150,6 +153,8 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             x_coresets, y_coresets, x_train, y_train = coreset_method(
                 x_coresets, y_coresets, x_train, y_train, coreset_size)
 
+
+        acc_interm = [] # Stores intermediate values of accuracy for plotting
         for i in range(no_iters):
             # finding data factor
             # compute cavity
@@ -162,6 +167,8 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             upper_mv = [upper_cav[0][0], upper_cav[1][0]]
             lower_n = [lower_cav[2], lower_cav[3]]
             upper_n = [upper_cav[2][0], upper_cav[3][0]]
+
+            # Initialisation options
             if task_id == 0 and i == 0:
                 ## different init here, use one but it seems ml solution gives
                 ## faster convergence
@@ -180,32 +187,26 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     lower_post = init_post(lower_mv, init_using_cav=False)
                     upper_post = init_post(upper_mv, init_using_cav=False)
 
-                ## init using the prior or cavity
-                # lower_post = init_post(lower_mv, init_using_cav=True)
-                # upper_post = init_post(upper_mv, init_using_cav=True)
+                    ## init using the prior or cavity
+                    # lower_post = init_post(lower_mv, init_using_cav=True)
+                    # upper_post = init_post(upper_mv, init_using_cav=True)
 
                 upper_transform = log_func
                 lower_transform = log_func
             elif i == 0:
-                # upper_post = upper_mv
-                # upper_post = init_post(upper_mv, init_using_cav=True)
+                lower_post = init_post(lower_mv, init_using_cav=False)
                 upper_post = init_post(upper_mv, init_using_cav=False)
                 upper_transform = log_func
-                lower_transform = ide_func
+                lower_transform = log_func
             else:
                 upper_transform = ide_func
                 lower_transform = ide_func
-
-            lower_post = init_post(lower_mv, init_using_cav=False)
-            upper_post = init_post(upper_mv, init_using_cav=False)
-            upper_transform = log_func
-            lower_transform = log_func
 
             model.assign_weights(
                 task_id, lower_post, upper_post, lower_transform, upper_transform)
             # train on non-coreset data
             model.reset_optimiser()
-            _, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize)
+            _, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, task_id, lower_mv, upper_mv, no_epochs, bsize, epoch_pause=epoch_pause)
             # get params and update factor
             lower_post, upper_post = model.get_weights(task_id)
             factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
@@ -239,8 +240,10 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
                                           data_factor=False, core_factor=True)
 
+
         np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
         #np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
+
 
         # Make prediction
         lower_post, upper_post = factory.compute_dist(
@@ -248,18 +251,40 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
         lower_mv = [lower_post[0], lower_post[1]]
         upper_mv = [[upper_post[0][i], upper_post[1][i]] for i in range(no_tasks)]
         model.assign_weights(range(no_tasks), lower_mv, upper_mv, log_func, log_func)
-        # pdb.set_trace()
         acc = utils.get_scores(model, x_testsets, y_testsets)
         if task_id == 0:
             all_acc = np.array(acc)
         else:
             all_acc = np.vstack([all_acc, acc])
-        #print acc
         print all_acc
 
-        # all_acc = utils.concatenate_results(acc, all_acc)
-        # pdb.set_trace()
+
+        for epoch_ind in range(len(lower_post_epoch)):
+
+            lower_post = lower_post_epoch[epoch_ind]
+            upper_post = upper_post_epoch[epoch_ind]
+            lower_mv1 = [lower_post[0], lower_post[1]]
+            upper_mv1 = [upper_post[0], upper_post[1]]
+            model.assign_weights(task_id, lower_mv1, upper_mv1, ide_func, ide_func)
+            acc = utils.get_scores(model, x_testsets, y_testsets)
+            if epoch_ind == 0:
+                acc_interm = np.array(acc)
+            else:
+                acc_interm = np.vstack([acc_interm, acc])
+            #acc_interm.append(acc)
+            #print acc
+
+        if task_id == 0:
+            accuracies = np.array(acc_interm)
+        else:
+            accuracies = np.vstack([accuracies, acc_interm])
+        # accuracies.append(acc_interm)
+
+        model.assign_weights(range(no_tasks), lower_mv, upper_mv, log_func, log_func)
+
+        #np.savez('sandbox/smallinitalways/accuracy_%d.npz' % task_id, acc=acc_interm, ind=[x+1 for x in epoch_pause])
         model.close_session()
+
 
     # Print in a suitable format
     for task_id in range(data_gen.max_iter):
@@ -267,4 +292,4 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             print all_acc[task_id][i],
         print ''
 
-    return all_acc
+    return all_acc, accuracies

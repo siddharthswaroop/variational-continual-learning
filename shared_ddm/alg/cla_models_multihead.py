@@ -329,7 +329,7 @@ class MFVI_NN(object):
         self.sess.close()
 
     def train(self, x_train, y_train, task_idx, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=10):
+              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[]):
         N = x_train.shape[0]
         if batch_size > N:
             batch_size = N
@@ -343,8 +343,8 @@ class MFVI_NN(object):
             self.training_size: N}
 
         # For visualising how weights change during training
-        # epoch_pause = [20, 80, 140, 142, 144, 146, 148, 150]
-        epoch_pause = []
+        #epoch_pause = range(1,no_epochs,3)
+        #epoch_pause = []
         lower_post_epoch = []
         upper_post_epoch = []
 
@@ -383,7 +383,7 @@ class MFVI_NN(object):
                 lower_post_epoch.append(lower_post_epoch1)
                 upper_post_epoch.append(upper_post_epoch1)
 
-        print("Optimization Finished!")
+        print("Optimisation Finished!")
         return costs, lower_post_epoch, upper_post_epoch
 
     def prediction(self, x_test, task_idx, batch_size=1000):
