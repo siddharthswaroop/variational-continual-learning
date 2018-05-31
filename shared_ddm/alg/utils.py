@@ -11,11 +11,13 @@ def merge_coresets(x_coresets, y_coresets):
         merged_y = np.vstack((merged_y, y_coresets[i]))
     return merged_x, merged_y
 
-def get_scores(model, x_testsets, y_testsets):
+def get_scores(model, x_testsets, y_testsets, no_repeats=1):
     acc = []
     for i in range(len(x_testsets)):
         x_test, y_test = x_testsets[i], y_testsets[i]
         pred = model.prediction_prob(x_test, i)
+        for j in range(no_repeats-1):
+            pred = pred + model.prediction_prob(x_test, i)
         pred_mean = np.mean(pred, axis=0)
         pred_y = np.argmax(pred_mean, axis=1)
         y = np.argmax(y_test, axis=1)

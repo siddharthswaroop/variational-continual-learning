@@ -24,10 +24,10 @@ class FactorManager():
         self.cu_n1 = [np.zeros([no_weights]) for no_weights in no_upper_weights]
         self.cu_n2 = [np.zeros([no_weights]) for no_weights in no_upper_weights]
         # prior factors
-        self.pl_n1 = np.zeros([no_lower_weights])
-        self.pl_n2 = np.ones([no_lower_weights])
-        self.pu_n1 = [np.zeros([no_weights]) for no_weights in no_upper_weights]
-        self.pu_n2 = [np.ones([no_weights]) for no_weights in no_upper_weights]
+        self.pl_n1 = np.ones([no_lower_weights])*0.2
+        self.pl_n2 = np.ones([no_lower_weights])*1.0
+        self.pu_n1 = [np.ones([no_weights])*0.2 for no_weights in no_upper_weights]
+        self.pu_n2 = [np.ones([no_weights])*1.0 for no_weights in no_upper_weights]
 
     def compute_dist(self, dl_idx, cl_idx, task_idx, remove_data, remove_core):
         dl_n1 = np.sum(self.dl_n1[dl_idx, :], axis=0)
@@ -241,7 +241,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                                           data_factor=False, core_factor=True)
 
 
-        np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
+        np.savez('sandbox/two_hidden_layers/unpruned/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
         #np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
 
 
