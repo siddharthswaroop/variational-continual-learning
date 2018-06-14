@@ -329,7 +329,7 @@ class MFVI_NN(object):
         self.sess.close()
 
     def train(self, x_train, y_train, task_idx, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[]):
+              no_epochs=1000, batch_size=100, display_epoch=100, epoch_pause=[]):
         N = x_train.shape[0]
         if batch_size > N:
             batch_size = N

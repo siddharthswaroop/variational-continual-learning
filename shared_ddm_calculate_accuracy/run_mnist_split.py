@@ -96,22 +96,38 @@ class PermutedMnistGenerator():
             return next_x_train, next_y_train, next_x_test, next_y_test
 
 
-for k in range(1):
+for k in range(4):
 
-    epoch_accuracy = [1] + range(10, 221, 10)
-    no_repeats_seed = 10
+    #epoch_accuracy = [1] + range(250, 1251, 250)
+    epoch_accuracy = [1000, 1000, 1000, 1000, 1000]
+    no_repeats_seed = 1
+    learning_rate = 0.01
+    small_init_always = True
     accuracies = []
 
+    #if k == 0:
+    #    small_init_always = True
+    #elif k == 1:
+    #    small_init_always = False
 
-    small_init_always = False
-    init_prev_means_small_var = True
+    if k == 0:
+        learning_rate = 0.01
+    elif k == 1:
+        learning_rate = 0.005
+    elif k == 2:
+        learning_rate = 0.001
+    elif k == 3:
+        learning_rate = 0.0005
+
+
+    init_prev_means_small_var = False
 
     for j in range(len(epoch_accuracy)):
 
         vcl_avg = None
         for i in range(no_repeats_seed):
-            print j, 'out of', len(epoch_accuracy), ', epoch up to', epoch_accuracy[j], '; repeat number', i
-            hidden_size = [256]
+            print j, 'out of', len(epoch_accuracy)-1, ', epoch up to', epoch_accuracy[j], '; repeat number', i
+            hidden_size = [256, 256]
             batch_size = 256
             no_epochs = epoch_accuracy[j]
             no_iters = 1
@@ -128,7 +144,7 @@ for k in range(1):
                 coreset_size = 0
                 data_gen = SplitMnistGenerator()
                 vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-                    coreset.rand_from_batch, coreset_size, batch_size, ml_init, small_init_always, init_prev_means_small_var, no_iters=no_iters)
+                    coreset.rand_from_batch, coreset_size, batch_size, ml_init, small_init_always, init_prev_means_small_var, no_iters=no_iters, learning_rate=learning_rate)
                 # print vcl_result
                 #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
@@ -165,4 +181,12 @@ for k in range(1):
         accuracies.append(vcl_result)
         print accuracies
 
-    np.savez('sandbox/prevmeans_smallvar/accuracy.npz', acc=accuracies, ind=epoch_accuracy)
+    if k == 0:
+        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_01.npz', acc=accuracies, ind=epoch_accuracy)
+    elif k == 1:
+        #np.savez('sandbox/two_hidden_layers/prevposterior/accuracy_adam_01.npz', acc=accuracies, ind=epoch_accuracy)
+        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_005.npz', acc=accuracies, ind=epoch_accuracy)
+    elif k == 2:
+        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_001.npz', acc=accuracies, ind=epoch_accuracy)
+    elif k == 3:
+        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_0005.npz', acc=accuracies, ind=epoch_accuracy)
