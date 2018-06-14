@@ -337,6 +337,7 @@ def visualise_weights_epoch(no_hiddens=256, epoch_pause = [20, 40, 100, 120], pa
 
 
 def check_weight_pruning(no_hiddens=[256], no_tasks = 3, no_classifiers=10, path=""):
+    path = "vi_batch_permuted_1000/"
     res_0 = np.load(path + 'weights_vi_batch_permuted_1000.npz')
     lower_0 = res_0['lower']
     upper_0 = res_0['upper']
@@ -360,7 +361,7 @@ def check_weight_pruning(no_hiddens=[256], no_tasks = 3, no_classifiers=10, path
     no_params = in_dim * no_hiddens[0]
     ml1 = m0[:no_params].reshape([in_dim, no_hiddens[0]])
     vl1 = v0[:no_params].reshape([in_dim, no_hiddens[0]])
-    param_index = no_params + no_hiddens[0]
+    param_index = no_params + no_hiddens[0] # Ignore bias terms
     no_params = no_hiddens[0] * no_hiddens[1]
     ml2 = m0[param_index:param_index+no_params].reshape([no_hiddens[0], no_hiddens[1]])
     vl2 = v0[param_index:param_index+no_params].reshape([no_hiddens[0], no_hiddens[1]])
@@ -375,6 +376,9 @@ def check_weight_pruning(no_hiddens=[256], no_tasks = 3, no_classifiers=10, path
 
 
     neuron = 82
+
+    print vl2[:, neuron]
+
     print np.max(mu3[neuron,:])
     print np.min(mu3[neuron,:])
 
@@ -384,7 +388,7 @@ def check_weight_pruning(no_hiddens=[256], no_tasks = 3, no_classifiers=10, path
     print mu3[neuron,:]
     print vu3[neuron,:]
 
-    x = np.linspace(-2, 2, 100)
+    #x = np.linspace(-2, 2, 100)
 
     """
     lims = no_hiddens[0]

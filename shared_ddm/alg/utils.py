@@ -11,16 +11,47 @@ def merge_coresets(x_coresets, y_coresets):
         merged_y = np.vstack((merged_y, y_coresets[i]))
     return merged_x, merged_y
 
-def get_scores(model, x_testsets, y_testsets, no_repeats=1):
+# For plotting histogram of activations
+def get_scores_hist_plot(model, x_testsets, y_testsets, no_repeats=1, single_head=False, path=""):
     acc = []
     for i in range(len(x_testsets)):
+        head = 0 if single_head else i
         x_test, y_test = x_testsets[i], y_testsets[i]
-        pred = model.prediction_prob(x_test, i)
+        pred = model.prediction_hist_plot(x_test, head)
         for j in range(no_repeats-1):
-            pred = pred + model.prediction_prob(x_test, i)
+            pred = pred + model.prediction_hist_plot(x_test, head)
+
+        y = np.argmax(y_test, axis=1)
+        hist_plot = []
+        for i in range(np.size(y)):
+            pred_test = pred[:,i,y[i]]
+            hist_plot.append(pred_test)
+        hist_plot = np.array(hist_plot)
+        hist_plot = hist_plot.reshape([-1])
+        plt.figure(1)
+        plt.hist(hist_plot, bins=500, histtype='stepfilled')
+        plt.suptitle('Histogram of activations (upper layer)')
+        plt.savefig(path + 'hist_test.png')
+
+    return acc
+
+def get_scores(model, x_testsets, y_testsets, no_repeats=1, single_head=False):
+    acc = []
+    for i in range(len(x_testsets)):
+        head = 0 if single_head else i
+        x_test, y_test = x_testsets[i], y_testsets[i]
+        pred = model.prediction(x_test, head)
+        for j in range(no_repeats-1):
+            pred = pred + model.prediction_prob(x_test, head)
         pred_mean = np.mean(pred, axis=0)
         pred_y = np.argmax(pred_mean, axis=1)
         y = np.argmax(y_test, axis=1)
+
+        sum_task_prob = 0.0
+        for j in range(np.size(y)):
+            sum_task_prob = sum_task_prob + pred_mean[j,y[j]]
+        print 2*i, sum_task_prob/np.size(y)
+
         cur_acc = len(np.where((pred_y - y) == 0)[0]) * 1.0 / y.shape[0]
         acc.append(cur_acc)
     return acc

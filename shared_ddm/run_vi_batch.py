@@ -98,7 +98,7 @@ class PermutedMnistGenerator():
 
 hidden_size = [100, 100]
 batch_size = 256
-no_epochs = 600
+no_epochs = 300
 Adam_learning_rate = 0.001
 
 option = 2

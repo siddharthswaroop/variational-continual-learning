@@ -17,7 +17,6 @@ def _create_weights(size):
     v = tf.Variable(tf.constant(np.zeros([no_weights]), dtype=tf.float32))
     return no_weights, m, v
 
-
 def _unpack_weights(m, v, size):
     start_ind = 0
     end_ind = 0
@@ -281,8 +280,27 @@ class MFVI_NN(object):
         for t, upper_size in enumerate(self.upper_sizes):
             self.upper_nets.append(HalfNet(upper_size))
 
+        self.costs_new = self._build_costs()
         self.costs = self._build_costs()
         self.preds = self._build_preds()
+        self.preds_hist_plot = self._build_preds_hist_plot()
+
+
+    def _build_costs_new(self):
+        kl_lower = self.lower_net.KL_term()
+        kl_lower_prior = self.lower_net.KL_prior_term()
+        costs = []
+        N = tf.cast(self.training_size, tf.float32)
+        for t, upper_net in enumerate(self.upper_nets):
+            kl_upper = upper_net.KL_term()
+            kl_upper_prior = upper_net.KL_prior_term()
+            log_pred = self.log_prediction_fn(
+                self.x, self.ys[t], t, self.no_train_samples)
+            kl_prior = tf.div(kl_lower_prior + kl_upper_prior, N)
+            kl_post = tf.div(kl_lower + kl_upper, N)
+            cost = tf.div(kl_post, kl_prior) - log_pred
+            costs.append(cost)
+        return costs
 
     def _build_costs(self):
         kl_lower = self.lower_net.KL_term()
@@ -303,11 +321,25 @@ class MFVI_NN(object):
             preds.append(pred)
         return preds
 
+    def _build_preds_hist_plot(self):
+        preds = []
+        for t, upper_net in enumerate(self.upper_nets):
+            pred = self.prediction_fn_hist_plot(self.x, t, self.no_test_samples)
+            preds.append(pred)
+        return preds
+
     def prediction_fn(self, inputs, task_idx, no_samples):
         K = no_samples
         inputs_3d = tf.tile(tf.expand_dims(inputs, 0), [K, 1, 1])
         lower_output = self.lower_net.prediction(inputs_3d, K)
         upper_output = self.upper_nets[task_idx].prediction(lower_output, K)
+        return upper_output
+
+    def prediction_fn_hist_plot(self, inputs, task_idx, no_samples):
+        K = no_samples
+        inputs_3d = tf.tile(tf.expand_dims(inputs, 0), [K, 1, 1])
+        lower_output = self.lower_net.prediction(inputs_3d, K)
+        upper_output = self.upper_nets[task_idx].prediction_hist_plot(lower_output, K)
         return upper_output
 
     def log_prediction_fn(self, inputs, targets, task_idx, no_samples):
@@ -329,7 +361,8 @@ class MFVI_NN(object):
         self.sess.close()
 
     def train(self, x_train, y_train, task_idx, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[]):
+              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[], task_id_test=0):
+
         N = x_train.shape[0]
         if batch_size > N:
             batch_size = N
@@ -366,9 +399,16 @@ class MFVI_NN(object):
                 feed_dict[self.x] = batch_x
                 feed_dict[self.ys[task_idx]] = batch_y
                 # Run optimization op (backprop) and cost op (to get loss value)
-                _, c = sess.run(
-                    [self.train_step, self.costs[task_idx]],
-                    feed_dict=feed_dict)
+
+                if task_id_test == 0:
+                    _, c = sess.run(
+                        [self.train_step, self.costs[task_idx]],
+                        feed_dict=feed_dict)
+                else:
+                    _, c = sess.run(
+                        [self.train_step, self.costs_new[task_idx]],
+                        feed_dict=feed_dict)
+
                 # Compute average loss
                 avg_cost += c / total_batch
                 # print i, total_batch, c
@@ -397,6 +437,24 @@ class MFVI_NN(object):
             batch_x = x_test[start_ind:end_ind, :]
             prediction = self.sess.run(
                 [self.preds[task_idx]],
+                feed_dict={self.x: batch_x})[0]
+            if i == 0:
+                predictions = prediction
+            else:
+                predictions = np.concatenate((predictions, prediction), axis=1)
+        return predictions
+
+    def prediction_hist_plot(self, x_test, task_idx, batch_size=1000):
+        # Test model
+        N = x_test.shape[0]
+        batch_size = N if batch_size > N else batch_size
+        total_batch = int(np.ceil(N * 1.0 / batch_size))
+        for i in range(total_batch):
+            start_ind = i * batch_size
+            end_ind = np.min([(i + 1) * batch_size, N])
+            batch_x = x_test[start_ind:end_ind, :]
+            prediction = self.sess.run(
+                [self.preds_hist_plot[task_idx]],
                 feed_dict={self.x: batch_x})[0]
             if i == 0:
                 predictions = prediction
@@ -481,11 +539,46 @@ class HalfNet():
         pre = tf.reshape(pre, [K, N, Dout])
         return pre
 
+    def prediction_hist_plot(self, inputs, no_samples):
+        #neuron = [58,128,90,101,224]
+        neuron = [77]
+        #neuron = range(5)
+        K = no_samples
+        N = tf.shape(inputs)[1]
+        Din = self.size[0]
+        Dout = self.size[-1]
+        mw, vw, mb, vb = self.mw, self.vw, self.mb, self.vb
+        act = inputs
+        for i in range(self.no_layers):
+            m_pre = 0
+            v_pre = 0
+            for j in range(np.size(neuron)):
+                m_pre = m_pre + tf.einsum('kn,o->kno', act[:,:,neuron[j]], mw[i][neuron[j],:])
+                #m_pre = m_pre + mb[i]
+                v_pre = v_pre + tf.einsum('kn,o->kno', act[:,:,neuron[j]] ** 2.0, tf.exp(vw[i][neuron[j],:]))
+                #v_pre = v_pre + tf.exp(vb[i])
+            eps = tf.random_normal([K, N, self.size[i + 1]], 0.0, 1.0, dtype=tf.float32)
+            pre = eps * tf.sqrt(1e-9 + v_pre) + m_pre
+            act = self.act_func(pre)
+        pre = tf.reshape(pre, [K, N, Dout])
+        return pre
+
     def KL_term(self):
         const_term = -0.5 * self.no_weights
         log_std_diff = 0.5 * tf.reduce_sum(tf.log(self.v0) - self.v)
         ## ignore log prior for now
         # log_std_diff = 0.5 * tf.reduce_sum(- self.v)
         mu_diff_term = 0.5 * tf.reduce_sum((tf.exp(self.v) + (self.m0 - self.m) ** 2) / self.v0)
+        kl = const_term + log_std_diff + mu_diff_term
+        return kl
+
+    def KL_prior_term(self):
+        v0 = 1.0
+        m0 = 0.0
+        const_term = -0.5 * self.no_weights
+        log_std_diff = 0.5 * tf.reduce_sum(tf.log(v0) - self.v)
+        ## ignore log prior for now
+        # log_std_diff = 0.5 * tf.reduce_sum(- self.v)
+        mu_diff_term = 0.5 * tf.reduce_sum((tf.exp(self.v) + (m0 - self.m) ** 2) / v0)
         kl = const_term + log_std_diff + mu_diff_term
         return kl

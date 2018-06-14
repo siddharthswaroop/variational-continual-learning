@@ -96,10 +96,10 @@ class PermutedMnistGenerator():
             return next_x_train, next_y_train, next_x_test, next_y_test
 
 
-no_permuted_tasks = 3
-hidden_size = [100, 100]
+no_permuted_tasks = 5
+hidden_size = [30, 30, 10]
 batch_size = 256
-no_epochs = 1000
+no_epochs = 500
 
 
 # Run vanilla VCL
