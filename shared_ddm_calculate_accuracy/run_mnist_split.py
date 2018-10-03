@@ -96,10 +96,9 @@ class PermutedMnistGenerator():
             return next_x_train, next_y_train, next_x_test, next_y_test
 
 
-for k in range(4):
+for k in range(2):
 
-    #epoch_accuracy = [1] + range(250, 1251, 250)
-    epoch_accuracy = [1000, 1000, 1000, 1000, 1000]
+    epoch_accuracy = [1] + range(250, 1251, 250)
     no_repeats_seed = 1
     learning_rate = 0.01
     small_init_always = True
@@ -109,15 +108,6 @@ for k in range(4):
     #    small_init_always = True
     #elif k == 1:
     #    small_init_always = False
-
-    if k == 0:
-        learning_rate = 0.01
-    elif k == 1:
-        learning_rate = 0.005
-    elif k == 2:
-        learning_rate = 0.001
-    elif k == 3:
-        learning_rate = 0.0005
 
 
     init_prev_means_small_var = False
@@ -181,12 +171,5 @@ for k in range(4):
         accuracies.append(vcl_result)
         print accuracies
 
-    if k == 0:
-        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_01.npz', acc=accuracies, ind=epoch_accuracy)
-    elif k == 1:
-        #np.savez('sandbox/two_hidden_layers/prevposterior/accuracy_adam_01.npz', acc=accuracies, ind=epoch_accuracy)
-        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_005.npz', acc=accuracies, ind=epoch_accuracy)
-    elif k == 2:
-        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_001.npz', acc=accuracies, ind=epoch_accuracy)
-    elif k == 3:
-        np.savez('sandbox/two_hidden_layers/smallinitalways/accuracy_adam_0005.npz', acc=accuracies, ind=epoch_accuracy)
+    if k == 1:
+        np.savez('sandbox/two_hidden_layers/smallinitalways/test.npz', acc=accuracies, ind=epoch_accuracy)

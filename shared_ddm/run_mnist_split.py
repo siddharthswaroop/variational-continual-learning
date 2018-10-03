@@ -164,14 +164,144 @@ class SingleHeadSplitMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
+class SingleHeadMnistGenerator():
+    def __init__(self):
+        f = gzip.open('data/mnist.pkl.gz', 'rb')
+        train_set, valid_set, test_set = cPickle.load(f)
+        f.close()
+
+        self.X_train = np.vstack((train_set[0], valid_set[0]))
+        self.X_test = test_set[0]
+        self.train_label = np.hstack((train_set[1], valid_set[1]))
+        self.test_label = test_set[1]
+
+
+        task1 = [0, 1, 2, 3]
+        task2 = [4]
+
+        task1 = [0, 1]
+        task2 = [2, 3]
+        task3 = [4, 5]
+        task4 = [6, 7]
+        task5 = [8, 9]
+
+        self.sets = [task1, task2, task3, task4, task5]
+        #self.sets = [task1, task2]
+
+        # Currently assuming classes are not repeated in self.sets for out_dim
+        #self.out_dim = np.size(self.sets)
+        self.max_iter = len(self.sets)
+
+        self.out_dim = 0
+        for dim in range(self.max_iter):
+            self.out_dim += np.size(self.sets[dim])
+
+        self.cur_iter = 0
+
+    def get_dims(self):
+        # Get data input and output dimensions
+        return self.X_train.shape[1], self.out_dim
+
+    def next_task(self):
+        if self.cur_iter >= self.max_iter:
+            raise Exception('Number of tasks exceeded!')
+        else:
+
+            next_x_train = []
+            next_y_train = []
+            next_x_test = []
+            next_y_test = []
+
+            # Loop over all classes in current iteration
+            for class_index in range(np.size(self.sets[self.cur_iter])):
+
+                # Find the correct set of training inputs
+                train_id = np.where(self.train_label == self.sets[self.cur_iter][class_index])[0]
+
+                # Stack the training inputs
+                if class_index == 0:
+                    next_x_train = self.X_train[train_id]
+                else:
+                    next_x_train = np.vstack((next_x_train, self.X_train[train_id]))
+
+                # Initialise next_y_train to zeros, then change relevant entries to ones, and then stack
+                next_y_train_interm = np.zeros((len(train_id), self.out_dim))
+                next_y_train_interm[:, self.sets[self.cur_iter][class_index]] = 1
+
+                if class_index == 0:
+                    next_y_train = next_y_train_interm
+                else:
+                    next_y_train = np.vstack((next_y_train, next_y_train_interm))
+
+                # Repeat above process for test inputs
+                test_id = np.where(self.test_label == self.sets[self.cur_iter][class_index])[0]
+
+                if class_index == 0:
+                    next_x_test = self.X_test[test_id]
+                else:
+                    next_x_test = np.vstack((next_x_test, self.X_test[test_id]))
+
+                next_y_test_interm = np.zeros((len(test_id), self.out_dim))
+                next_y_test_interm[:, self.sets[self.cur_iter][class_index]] = 1
+
+                if class_index == 0:
+                    next_y_test = next_y_test_interm
+                else:
+                    next_y_test = np.vstack((next_y_test, next_y_test_interm))
+
+            self.cur_iter += 1
+
+            return next_x_train, next_y_train, next_x_test, next_y_test
+
 
 vcl_avg = None
 no_repeats = 1
 for i in range(no_repeats):
 
+    if i == 0:
+        # Set to true to load weights from 'path' and calculate accuracy (no training)
+        calculate_acc = False
+        store_weights = True
+        path = 'sandbox/one_hidden_layer/10000epochs/'
+
+        hidden_size = [256]
+        batch_size = 256
+        no_epochs = 10000
+        no_iters = 1
+
+        ml_init = False
+
+        # Run vanilla VCL
+        tf.reset_default_graph()
+        tf.set_random_seed(10+i)
+        np.random.seed(10+i)
+
+        option = 1
+
+    else:
+        # Set to true to load weights from 'path' and calculate accuracy (no training)
+        calculate_acc = False
+        store_weights = True
+        path = 'sandbox/two_hidden_layers/10000epochs/'
+
+        hidden_size = [256, 256]
+        batch_size = 256
+        no_epochs = 10000
+        no_iters = 1
+
+        ml_init = False
+
+        # Run vanilla VCL
+        tf.reset_default_graph()
+        tf.set_random_seed(10 + i)
+        np.random.seed(10 + i)
+
+        option = 1
+
     # Set to true to load weights from 'path' and calculate accuracy (no training)
-    calculate_acc = True
-    path = 'sandbox/singlehead/coreset_200/'
+    calculate_acc = False
+    store_weights = True
+    path = 'sandbox/singlehead/one_hidden_layer/300epochs/const_upper/'
 
     hidden_size = [256]
     batch_size = 256
@@ -182,35 +312,43 @@ for i in range(no_repeats):
 
     # Run vanilla VCL
     tf.reset_default_graph()
-    tf.set_random_seed(10+i)
-    np.random.seed(10+i)
+    random_seed = 10 + i
+    tf.set_random_seed(random_seed)
+    np.random.seed(random_seed)
 
-    option = 2
+    option = 3
 
-    #if len(sys.argv) == 2:
-    #    option = int(sys.argv[1])
-    #else:
-    #    option = 4
+    fix_upper_weights = True
 
     if option == 1:
         single_head = False
         coreset_size = 0
         data_gen = SplitMnistGenerator()
         vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, coreset_size, batch_size, ml_init, path, calculate_acc, no_iters=no_iters, single_head=single_head)
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, path, calculate_acc, no_iters=no_iters, single_head=single_head, store_weights=store_weights)
         # print vcl_result
         #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
     elif option == 2:
         single_head = True
-        coreset_size = 200
+        coreset_size = 0
         data_gen = SingleHeadSplitMnistGenerator()
         vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, coreset_size, batch_size, ml_init, path, calculate_acc, no_iters=no_iters, single_head=single_head)
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, path, calculate_acc, no_iters=no_iters, single_head=single_head, store_weights=store_weights)
         # print vcl_result
         #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
+
     elif option == 3:
+        single_head = True
+        coreset_size = 0
+        data_gen = SingleHeadMnistGenerator()
+        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, coreset_size, batch_size, ml_init, path, calculate_acc, no_iters=no_iters, single_head=single_head, store_weights=store_weights, fix_upper_weights=fix_upper_weights)
+        # print vcl_result
+        #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
+
+    elif option == 4:
         hidden_size = [16, 256]
         path = 'sandbox/overpruning_tests/small_big_layers/'
         #hidden_size = [256, 256]

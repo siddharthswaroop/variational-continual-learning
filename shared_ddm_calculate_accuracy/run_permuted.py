@@ -21,10 +21,10 @@ class SplitMnistGenerator():
         self.train_label = np.hstack((train_set[1], valid_set[1]))
         self.test_label = test_set[1]
 
-        # self.sets_0 = [0, 2, 4, 6, 8]
-        # self.sets_1 = [1, 3, 5, 7, 9]
-        self.sets_0 = [0, 2, 8]
-        self.sets_1 = [1, 3, 9]
+        self.sets_0 = [0, 2, 4, 6, 8]
+        self.sets_1 = [1, 3, 5, 7, 9]
+        #self.sets_0 = [0, 2, 8]
+        #self.sets_1 = [1, 3, 9]
         self.max_iter = len(self.sets_0)
         self.cur_iter = 0
 
@@ -97,9 +97,9 @@ class PermutedMnistGenerator():
 
 
 no_permuted_tasks = 3
-hidden_size = [100, 100]
+hidden_size = [256]
 batch_size = 256
-no_epochs = 1000
+no_epochs = 300
 
 
 # Run vanilla VCL
@@ -107,7 +107,7 @@ tf.reset_default_graph()
 tf.set_random_seed(12)
 np.random.seed(1)
 
-option = 1
+option = 3
 
 #if len(sys.argv) == 2:
 #    option = int(sys.argv[1])
@@ -133,6 +133,14 @@ elif option == 2:
     print rand_vcl_result
     #pickle.dump(rand_vcl_result, open('results/rand_vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
+if option == 3:
+    no_iters = 1
+    coreset_size = 0
+    data_gen = SplitMnistGenerator()
+    vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+        coreset.rand_from_batch, coreset_size, batch_size, no_iters=no_iters)
+    # print vcl_result
+    #pickle.dump(vcl_result, open('results/vcl_split_result_%d.pkl'%no_iters, 'wb'), pickle.HIGHEST_PROTOCOL)
 
 # # Plot average accuracy
 # vcl_avg = np.nanmean(vcl_result, 1)

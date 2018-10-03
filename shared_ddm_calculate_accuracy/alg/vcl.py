@@ -244,7 +244,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
                                           data_factor=False, core_factor=True)
 
-        #np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
+        np.savez('sandbox/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
         #np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
 
         # Make prediction

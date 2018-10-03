@@ -143,9 +143,10 @@ def visualise_weights_vi_batch(no_hiddens=256, path=""):
 def visualise_weights(no_hiddens=256, path=""):
 
 
-    no_tasks = 5
+    no_tasks = 1
 
-    for task_id in range(no_tasks):
+    for task_idx in range(no_tasks):
+        task_id = 2
         res = np.load(path + 'weights_%d.npz' % task_id)
         lower = res['lower']
         m_low = lower[0,:]
@@ -171,8 +172,8 @@ def visualise_weights(no_hiddens=256, path=""):
         fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
         fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
 
-        fig0.suptitle("Mean after task %d, min = %f, max = %f" % (task_id+1, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
-        fig1.suptitle("Variance after task %d, min = %f, max = %f" % (task_id+1, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
+        #fig0.suptitle("Mean after task %d, min = %f, max = %f" % (task_id+1, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+        #fig1.suptitle("Variance after task %d, min = %f, max = %f" % (task_id+1, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
 
         for i in range(no_rows):
             for j in range(no_cols):
@@ -200,8 +201,8 @@ def visualise_weights(no_hiddens=256, path=""):
 
         x = np.linspace(-x_max, x_max, 100)
         fig, axs = plt.subplots(no_rows, no_cols, figsize=(10, 10))
-        fig.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (
-        task_id + 1, task_id + 1, -x_max, x_max))
+        #fig.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (
+        #task_id + 1, task_id + 1, -x_max, x_max))
 
         for i in range(no_rows):
             for j in range(no_cols):

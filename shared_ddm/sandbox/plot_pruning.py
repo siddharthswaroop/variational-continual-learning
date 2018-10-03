@@ -103,15 +103,17 @@ def hist_weights_pruning_one_layer(no_tasks=5, path = ""):
 def hist_weights_pruning(no_hiddens = [256], path = ""):
 
     update_test_weights = False
-    no_tasks=5
+    no_tasks = 5
     plot_figures = True
     pruned_var = 0.000001
 
-    if path == "two_hidden_layers/pruned_nonzeromean/":
-        m_prior = 0.2
-        print 'nonzero prior'
-    else:
-        m_prior = 0.0
+    #if path == "two_hidden_layers/pruned_nonzeromean/":
+    #    m_prior = 0.2
+    #    print 'nonzero prior'
+    #else:
+    #    m_prior = 0.0
+    m_prior = 0.0
+
 
     pruned_units = []
     pruned_units_prev = []
@@ -195,16 +197,25 @@ def hist_weights_pruning(no_hiddens = [256], path = ""):
                     print np.size(np.where(snr_output > snr_upper_cutoff))
 
 
-            if plot_figures and layer > 0:
-                plt.figure(task_id+1)
-                plt.hist(KL, bins=500, range=(0,KL.max()), histtype='stepfilled', label='layer %d' % (layer))
-                plt.suptitle('KL histogram after task %d' % (task_id+1))
+            if plot_figures and task_id == 4:
+                plt.figure()
+                plt.hist(KL, bins=500, histtype='stepfilled', label='layer %d' % (layer))
+                #plt.suptitle('KL histogram after task %d' % (task_id+1))
+                plt.ylim((0,10))
+                plt.xlabel('Value of KL to prior')
+                plt.ylabel('Frequency')
                 plt.legend()
+                plt.savefig(path + 'hist_task%d_layer%d_KL.png' % (task_id+1, layer), bbox_inches='tight')
 
-                #plt.figure(task_id+6)
-                #plt.hist(snr, bins=500, range=(0, snr.max()), histtype='stepfilled', label='layer %d' % (layer))
-                #plt.suptitle('SNR histogram after task %d' % (task_id + 1))
-                #plt.legend()
+                if layer > 0:
+                    plt.figure()
+                    plt.hist(snr_output, bins=500, histtype='stepfilled', label='layer %d' % (layer-1))
+                    #plt.suptitle('SNR histogram after task %d' % (task_id + 1))
+                    plt.legend()
+                    plt.ylim((0,10))
+                    plt.xlabel('SNR')
+                    plt.ylabel('Frequency')
+                    plt.savefig(path + 'hist_task%d_layer%d_SNR.png' % (task_id+1, layer), bbox_inches='tight')
 
                 #if layer > 0:
                 #    plt.figure(task_id + 6)
@@ -227,14 +238,20 @@ def hist_weights_pruning(no_hiddens = [256], path = ""):
         snr_upper = np.sqrt(m_upper[:no_hiddens[-1]]**2/var_upper[:no_hiddens[-1]])/no_hiddens[-1]
         snr_upper_diff = np.abs(np.sqrt(2)*(m_upper[:,0]-m_upper[:,1])/np.sqrt(var_upper[:,0] + var_upper[:,1]))/(no_hiddens[-1]+1)
 
-        if plot_figures:
-            #plt.figure(task_id+11)
-            #plt.hist(snr_upper, bins=500, histtype='stepfilled')
+        if plot_figures and task_id == 4:
+            plt.figure()
+            plt.hist(np.resize(snr_upper,[-1]), bins=500, histtype='stepfilled')
             #plt.suptitle('SNR histogram of upper weights after task %d' % (task_id + 1))
+            plt.ylim((0,10))
+            plt.xlabel('SNR')
+            plt.ylabel('Frequency')
+            plt.legend()
+            plt.savefig(path + 'hist_task%d_output_SNR.png' % (task_id + 1), bbox_inches='tight')
 
-            plt.figure(task_id+16)
-            plt.hist(snr_upper_diff, bins=500, histtype='stepfilled')
-            plt.suptitle('SNR [diff] histogram of upper weights after task %d' % (task_id + 1))
+            #plt.figure(task_id+16)
+            #plt.hist(snr_upper_diff, bins=500, histtype='stepfilled')
+            #plt.suptitle('SNR [diff] histogram of upper weights after task %d' % (task_id + 1))
+            #plt.ylim((0, 10))
 
         #print np.where(snr_upper>snr_upper_cutoff)
         #print m_upper[np.where(snr_upper>snr_upper_cutoff)]
@@ -242,6 +259,10 @@ def hist_weights_pruning(no_hiddens = [256], path = ""):
         #print 'test'
         if snr_upper_cutoff is not None and task_id == 4:
             print np.where(snr_upper_diff > snr_upper_cutoff)
+
+        if snr_upper_cutoff is not None:
+            m_upper[np.where(snr_upper < snr_upper_cutoff), :] = 0
+            var_upper[np.where(snr_upper < snr_upper_cutoff), :] = pruned_var
 
         if KL_cutoff is not None:
             m_upper[np.where(KL < KL_cutoff), :] = 0
@@ -255,8 +276,8 @@ def hist_weights_pruning(no_hiddens = [256], path = ""):
         if update_test_weights:
             np.savez(path + 'test/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
 
-    if plot_figures:
-        plt.show()
+    #if plot_figures:
+    #    plt.show()
 
 
 

@@ -159,7 +159,6 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
         m_upper = upper[0,:]
         var_upper = np.exp(upper[1,:])
 
-
         # Lower network
         for layer in range(len(no_hiddens)):
 
@@ -199,19 +198,25 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
             no_cols = int(np.sqrt(no_hiddens[layer]))
             no_rows = int(no_hiddens[layer]/no_cols)
 
+            no_cols = 32
+            no_rows = 8
+
             #neurons_interest = [114, 8, 122, 1]
             #print task_id, m_low[-1,neurons_interest], var_low[-1,neurons_interest]
 
             if plot_lower:
                 print "creating lower figures ..."
 
-                fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
-                fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
+                fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(20, 5))
+                fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(20, 5))
                 #fig2, axs2 = plt.subplots(no_rows, no_cols, figsize=(10, 10))
 
                 fig0.suptitle("Task %d, Layer %d, Mean, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
                 fig1.suptitle("Task %d, Layer %d, Variance, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
                 #fig2.suptitle("snr, task %d, layer %d, min = %f, max = %f" % (task_id+1, layer, snr_min, snr_max))
+
+                fig0.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+                fig1.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
 
                 for i in range(no_rows):
                     for j in range(no_cols):
@@ -232,17 +237,25 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
                         #axs2[i, j].set_xticks(np.array([]))
                         #axs2[i, j].set_yticks(np.array([]))
 
-                fig0.savefig(path + 'task%d_layer%d_mean.png' % (task_id+1, layer))
-                fig1.savefig(path + 'task%d_layer%d_var.png' % (task_id+1, layer))
+                fig0.savefig(path + 'task%d_layer%d_mean.png' % (task_id+1, layer), bbox_inches='tight')
+                fig1.savefig(path + 'task%d_layer%d_var.png' % (task_id+1, layer), bbox_inches='tight')
                 #fig2.savefig('/two_hidden_layers/lower_snr_task%d_layer%d.pdf' % (task_id+1, layer))
 
 
         # Upper weights
         no_digits = no_tasks*2 if single_head else 2
-        no_digits = 10
+        #no_digits = 10
         no_params = no_hiddens[-1] * 2
-        m_upper = m_upper.reshape([no_hiddens[-1]+1, no_digits])
-        var_upper = var_upper.reshape([no_hiddens[-1]+1, no_digits])
+
+        # OLD (Pre fix_upper_weights)
+        #m_upper = m_upper.reshape([no_hiddens[-1]+1, no_digits])
+        #var_upper = var_upper.reshape([no_hiddens[-1]+1, no_digits])
+
+        # POST fix_upper_weights
+        m_upper = np.transpose(m_upper)
+        var_upper = np.transpose(var_upper)
+
+
         #x_max = np.max(np.abs(m_upper[:no_hiddens[-1],2*task_id:2*task_id+1]) + np.sqrt(var_upper[:no_hiddens[-1],2*task_id:2*task_id+1]))
         x_max = np.max(np.abs(m_upper[:no_hiddens[-1]]) + np.sqrt(var_upper[:no_hiddens[-1]]))
         #x_max = 10.0
@@ -250,14 +263,18 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
         no_cols = int(np.sqrt(no_hiddens[-1]))
         no_rows = int(no_hiddens[-1]/no_cols)
 
-        x = np.linspace(-x_max, x_max, 3000)
+        no_cols = 32
+        no_rows = 8
+
+        x = np.linspace(-x_max, x_max, 1000)
 
         if plot_upper:
             print  "creating upper figures ..."
 
-            fig, axs = plt.subplots(no_rows, no_cols, figsize=(10, 10))
+            fig, axs = plt.subplots(no_rows, no_cols, figsize=(20, 5))
             fig.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (
             task_id + 1, task_id + 1, -x_max, x_max))
+            fig.suptitle("Min = %f, Max = %f" % (-x_max, x_max))
 
             no_plot_digits = (task_id+1)*2 if single_head else 2
             no_plot_digits = 10
@@ -270,7 +287,7 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
                     axs[i, j].set_yticks(np.array([]))
                     axs[i, j].set_ylim([0, 2.0])
             axs[i,j].legend()
-            fig.savefig(path + 'task%d_upper.png' % (task_id+1))
+            fig.savefig(path + 'task%d_upper.png' % (task_id+1), bbox_inches='tight')
 
             # Plot bias of upper weights
             x_bias_max = np.max(np.abs(m_upper[-1])) + np.sqrt(np.max(var_upper[-1]))*2
@@ -776,10 +793,72 @@ def check_weight_pruning(no_hiddens=256, path=""):
         plt.savefig('/tmp/task_2_unit_%d.pdf' % i)
     """
 
+
+def plot_pred_values(path=""):
+
+    no_tasks = 5
+    task_range = range(no_tasks)
+    #task_range = [0, 1, 2]
+
+    for task_id in task_range:
+        res = np.load(path + 'pred_%d.npz' % task_id)
+        pred = res['pred']
+        pred_true = res['pred_true']
+        pred_total = res['pred_total']
+
+        #print task_id
+
+        plt.figure(task_id + 1)
+        for task_id2 in range(task_id+1):
+            #print task_id2, np.average(lower[task_id2])
+            hist_plot = np.array(pred[task_id2])
+            plt.hist(hist_plot, bins=50, histtype='stepfilled', label='%d' % task_id2)
+            plt.suptitle('Predicted classes\' pred values for task %d' % task_id)
+
+        plt.figure(task_id + no_tasks + 1)
+        for task_id2 in range(task_id+1):
+            #print task_id2, np.average(lower[task_id2])
+            hist_plot = np.array(pred_true[task_id2])
+            plt.hist(hist_plot, bins=50, histtype='stepfilled', label='%d' % task_id2)
+            plt.suptitle('True classes\' pred values for task %d' % task_id)
+
+        plt.figure(task_id + 2*no_tasks + 1)
+        for task_id2 in range(task_id+1):
+            #print task_id2, np.average(lower[task_id2])
+            hist_plot = []
+
+            for task_id3 in task_range:
+                hist_plot = np.concatenate((hist_plot, pred_total[task_id2][task_id3]))
+                #print pred_total[task_id3]
+
+            plt.hist(hist_plot, bins=50, histtype='stepfilled', label='%d' % task_id2)
+            plt.suptitle('Total classes\' pred values after task %d' % task_id)
+
+    for task_id in task_range:
+        plt.figure(task_id + 1)
+        plt.legend()
+        plt.savefig(path + 'pred_hist_%d.png' % task_id)
+
+        plt.figure(task_id + no_tasks + 1)
+        plt.legend()
+        plt.savefig(path + 'pred_true_hist_%d.png' % task_id)
+
+        plt.figure(task_id + 2*no_tasks + 1)
+        plt.legend()
+        plt.savefig(path + 'pred_total_hist_%d.png' % task_id)
+
+
+
 if __name__ == "__main__":
     epoch_pause = []
     no_hiddens = [256]
     single_head = True
+    path = "singlehead/one_hidden_layer/10000epochs/"
+
+    path = "singlehead/one_hidden_layer/incremental_class/"
+
     print 'Local reparameterisation, plot weights'
 
-    visualise_layer_weights(no_hiddens, path="singlehead/test_long/", single_head=single_head)
+    #visualise_layer_weights(no_hiddens, path="singlehead/test_long/", single_head=single_head)
+    visualise_layer_weights(no_hiddens, path=path, single_head=single_head)
+    #plot_pred_values(path=path)

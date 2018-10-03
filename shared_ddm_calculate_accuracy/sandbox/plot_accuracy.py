@@ -58,4 +58,4 @@ if __name__ == "__main__":
     print 'Local reparameterisation, plot accuracy'
 
     #fix_acc()
-    accuracy_epoch(no_tasks, path="two_hidden_layers/prevposterior/")
+    accuracy_epoch(no_tasks, path="smallinitalways/")
