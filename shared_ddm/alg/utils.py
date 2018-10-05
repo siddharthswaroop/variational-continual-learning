@@ -35,7 +35,7 @@ def get_scores_hist_plot(model, x_testsets, y_testsets, no_repeats=1, single_hea
 
     return acc
 
-def get_scores_output_pred(model, x_testsets, y_testsets, no_repeats=1, single_head=False, task_id=0):
+def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repeats=1, task_id=0):
 
     acc = []
     pred_vec = []
@@ -43,26 +43,36 @@ def get_scores_output_pred(model, x_testsets, y_testsets, no_repeats=1, single_h
     pred_vec_total = []
 
     for i in range(len(x_testsets)):
-        head = 0 if single_head else i
+        #head = 0 if single_head else i
         x_test, y_test = x_testsets[i], y_testsets[i]
-        pred = model.prediction(x_test, head)
+        pred = model.prediction(x_test)
         for j in range(no_repeats-1):
-            pred = pred + model.prediction_prob(x_test, head)
-        pred_mean = np.mean(pred, axis=0)
-        pred_y = np.argmax(pred_mean, axis=1)
+            pred = pred + model.prediction(x_test)
+        pred_mean_total = np.mean(pred, axis=1)
+        pred_mean = np.zeros(np.shape(pred_mean_total))
+        pred_mean[test_classes[i], :, :] = pred_mean_total[test_classes[i], :, :]
+        pred_y = np.argmax(pred_mean, axis=0)
+        pred_y = pred_y[:, 0]
         y = np.argmax(y_test, axis=1)
+
+        # print 'pred', np.shape(pred)
+        # print 'pred_mean', np.shape(pred_mean)
+        # print 'pred_y', np.shape(pred_y)
+        # print 'y', np.shape(y)
+        # for j in range(10):
+        #     print pred_y[j], np.transpose(pred_y)[j], y[j]
 
         #print 'pred mean', i, model.prediction_prob(x_test, head)
 
         sum_task_prob = 0.0
         for j in range(np.size(y)):
-            sum_task_prob = sum_task_prob + pred_mean[j,y[j]]
+            sum_task_prob = sum_task_prob + pred_mean_total[y[j],j]
 
             ## Print if we are predicting something other than digits from the most recently seen task
             #if not (pred_y[j] == 2*task_id or pred_y[j] == 2*task_id+1):
             #    print y[j], pred_y[j]
 
-        print 2*i, sum_task_prob/np.size(y)
+        print 'task', i, 'avg_pred', sum_task_prob/np.size(y)
 
         ## Compare pred values for certain tasks
         #if i == 1 and task_id == 2:

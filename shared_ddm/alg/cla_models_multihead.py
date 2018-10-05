@@ -137,203 +137,14 @@ def _unpack_point_weights(m, size):
     return m_weights, m_biases
 
 
-class ML_NN(object):
-    def __init__(self, lower_size, upper_sizes):
-        self.lower_size = lower_size
-        self.no_tasks = len(upper_sizes)
-        self.upper_sizes = upper_sizes
-        # input and output placeholders
-        self.x = tf.placeholder(tf.float32, [None, lower_size[0]])
-        self.ys = [
-            tf.placeholder(tf.float32, [None, upper_size[-1]])
-            for upper_size in upper_sizes]
-        self.training_size = tf.placeholder(tf.int32)
-
-        self.lower_net = PointHalfNet(lower_size)
-        self.upper_nets = []
-        for t, upper_size in enumerate(self.upper_sizes):
-            self.upper_nets.append(PointHalfNet(upper_size))
-
-        self.costs = self._build_costs()
-        self.preds = self._build_preds()
-
-    def _build_costs(self):
-        costs = []
-        N = tf.cast(self.training_size, tf.float32)
-        for t, upper_net in enumerate(self.upper_nets):
-            log_pred = self.log_prediction_fn(
-                self.x, self.ys[t], t)
-            cost = - log_pred
-            costs.append(cost)
-        return costs
-
-    def _build_preds(self):
-        preds = []
-        for t, upper_net in enumerate(self.upper_nets):
-            pred = self.prediction_fn(self.x, t)
-            preds.append(pred)
-        return preds
-
-    def prediction_fn(self, inputs, task_idx):
-        lower_output = self.lower_net.prediction(inputs)
-        upper_output = self.upper_nets[task_idx].prediction(lower_output)
-        return upper_output
-
-    def log_prediction_fn(self, inputs, targets, task_idx):
-        pred = self.prediction_fn(inputs, task_idx)
-        log_lik = - tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=targets))
-        return log_lik
-
-    def init_session(self, task_idx, learning_rate):
-        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.costs[task_idx])
-        # Initializing the variables
-        init = tf.global_variables_initializer()
-        # launch a session
-        self.sess = tf.Session()
-        self.sess.run(init)
-
-    def close_session(self):
-        self.sess.close()
-
-    def train(self, x_train, y_train, task_idx,
-              no_epochs=1000, batch_size=100, display_epoch=20):
-        N = x_train.shape[0]
-        if batch_size > N:
-            batch_size = N
-        sess = self.sess
-        costs = []
-        feed_dict = {}
-
-        # Training cycle
-        for epoch in range(no_epochs):
-            perm_inds = range(x_train.shape[0])
-            np.random.shuffle(perm_inds)
-            cur_x_train = x_train[perm_inds]
-            cur_y_train = y_train[perm_inds]
-
-            avg_cost = 0.
-            total_batch = int(np.ceil(N * 1.0 / batch_size))
-            # Loop over all batches
-            for i in range(total_batch):
-                start_ind = i * batch_size
-                end_ind = np.min([(i + 1) * batch_size, N])
-                batch_x = cur_x_train[start_ind:end_ind, :]
-                batch_y = cur_y_train[start_ind:end_ind, :]
-                feed_dict[self.x] = batch_x
-                feed_dict[self.ys[task_idx]] = batch_y
-                # Run optimization op (backprop) and cost op (to get loss value)
-                _, c = sess.run(
-                    [self.train_step, self.costs[task_idx]],
-                    feed_dict=feed_dict)
-                # Compute average loss
-                avg_cost += c / total_batch
-                # print i, total_batch, c
-            # Display logs per epoch step
-            if epoch % display_epoch == 0:
-                print("Epoch:", '%04d' % (epoch + 1), "cost=", \
-                      "{:.9f}".format(avg_cost))
-            costs.append(avg_cost)
-        print("Optimization Finished!")
-        return costs
-
-    def prediction(self, x_test, task_idx, batch_size=1000):
-        # Test model
-        N = x_test.shape[0]
-        batch_size = N if batch_size > N else batch_size
-        total_batch = int(np.ceil(N * 1.0 / batch_size))
-        for i in range(total_batch):
-            start_ind = i * batch_size
-            end_ind = np.min([(i + 1) * batch_size, N])
-            batch_x = x_test[start_ind:end_ind, :]
-            prediction = self.sess.run(
-                [self.preds[task_idx]],
-                feed_dict={self.x: batch_x})[0]
-            if i == 0:
-                predictions = prediction
-            else:
-                predictions = np.concatenate((predictions, prediction), axis=0)
-        return predictions
-
-    def prediction_prob(self, x_test, task_idx, batch_size=1000):
-        prob = self.sess.run(
-            [tf.nn.softmax(self.prediction(x_test, task_idx, batch_size))],
-            feed_dict={self.x: x_test})[0]
-        return prob
-
-    def get_weights(self, task_idx):
-        res = self.sess.run(
-            [self.lower_net.params, self.upper_nets[task_idx].params])
-        return res
-
-    def assign_weights(self, task_idx, lower_weights, upper_weights):
-        lower_net = self.lower_net
-        self.sess.run(
-            [lower_net.assign_m_op],
-            feed_dict={lower_net.new_m: lower_weights[0]})
-
-        if not isinstance(task_idx, (list,)):
-            task_idx = [task_idx]
-            upper_weights = [upper_weights]
-
-        for i, idx in enumerate(task_idx):
-            upper_net = self.upper_nets[idx]
-            self.sess.run(
-                [upper_net.assign_m_op],
-                feed_dict={upper_net.new_m: upper_weights[i][0]})
-
-    def reset_optimiser(self):
-        optimizer_scope = tf.get_collection(
-            tf.GraphKeys.GLOBAL_VARIABLES,
-            "scope/prefix/for/optimizer")
-        self.sess.run(tf.initialize_variables(optimizer_scope))
-
-
-class PointHalfNet():
-    def __init__(self, size, act_func=tf.nn.tanh):
-        self.size = size
-        self.no_layers = len(size) - 1
-        self.act_func = act_func
-
-        # creating weights
-        self.no_weights, self.m = _create_point_weights(self.size)
-        self.mw, self.mb = _unpack_point_weights(self.m, self.size)
-        self.params = [self.m]
-
-        self.new_m = tf.placeholder(tf.float32, [self.no_weights])
-        self.assign_m_op = tf.assign(self.m, self.new_m)
-
-        # prior as place holder as these can change
-        self.m0 = tf.placeholder(tf.float32, [self.no_weights])
-        self.v0 = tf.placeholder(tf.float32, [self.no_weights])
-
-    def prediction(self, inputs):
-        N = tf.shape(inputs)[0]
-        Din = self.size[0]
-        Dout = self.size[-1]
-        mw, mb = self.mw, self.mb
-        act = inputs
-        for i in range(self.no_layers):
-            pre_W = tf.einsum('ni,io->no', act, mw[i])
-            pre_b = mb[i]
-            pre = pre_W + pre_b
-            act = self.act_func(pre)
-        pre = tf.reshape(pre, [N, Dout])
-        return pre
-
-    def L2_constraint(self):
-        # ignore all the constant terms
-        mu_diff_term = - 0.5 * tf.reduce_sum((self.m0 - self.m) ** 2 / self.v0)
-        l2 = mu_diff_term
-        return l2
-
-
 class MFVI_NN(object):
     def __init__(
             self, lower_size, upper_sizes,
-            no_train_samples=10, no_test_samples=100, fix_upper_weights = False):
+            no_train_samples=10, no_test_samples=100, training_loss_classes=[], data_classes=[]):
         self.lower_size = lower_size
-        self.no_tasks = len(upper_sizes)
+        self.no_tasks = len(training_loss_classes)
+        self.data_classes = data_classes
+        self.training_loss_classes = training_loss_classes
         self.upper_sizes = upper_sizes
         self.no_train_samples = no_train_samples
         self.no_test_samples = no_test_samples
@@ -347,30 +158,50 @@ class MFVI_NN(object):
         self.lower_net = HalfNet(lower_size)
         self.upper_nets = []
         for t, upper_size in enumerate(self.upper_sizes):
-            if fix_upper_weights:
-                self.upper_nets.append(UpperHalfNet(upper_size))
-            else:
-                self.upper_nets.append(HalfNet(upper_size))
+            ############# For singlehead fix upper weights, use UpperHalfNet
+            #if fix_upper_weights:
+            #    self.upper_nets.append(UpperHalfNet(upper_size))
+            #else:
+            #    self.upper_nets.append(HalfNet(upper_size))
+            self.upper_nets.append(HalfNet(upper_size))
 
-        self.costs_new = self._build_costs()
+        self.training_loss = self._build_training_loss()
         self.costs = self._build_costs()
         self.preds = self._build_preds()
         self.preds_hist_plot = self._build_preds_hist_plot()
 
 
-    def _build_costs_new(self):
+    # def _build_costs_new(self):
+    #     kl_lower = self.lower_net.KL_term()
+    #     kl_lower_prior = self.lower_net.KL_prior_term()
+    #     costs = []
+    #     N = tf.cast(self.training_size, tf.float32)
+    #     for t, upper_net in enumerate(self.upper_nets):
+    #         kl_upper = upper_net.KL_term()
+    #         kl_upper_prior = upper_net.KL_prior_term()
+    #         log_pred = self.log_prediction_fn(
+    #             self.x, self.ys[t], t, self.no_train_samples)
+    #         kl_prior = tf.div(kl_lower_prior + kl_upper_prior, N)
+    #         kl_post = tf.div(kl_lower + kl_upper, N)
+    #         cost = tf.div(kl_post, kl_prior) - log_pred
+    #         costs.append(cost)
+    #     return costs
+    #
+    def _build_training_loss(self):
+        # Go over each task, and only append after adding the costs from the relevant classes in each task. This is then used in AdamOptimizer
         kl_lower = self.lower_net.KL_term()
-        kl_lower_prior = self.lower_net.KL_prior_term()
         costs = []
         N = tf.cast(self.training_size, tf.float32)
-        for t, upper_net in enumerate(self.upper_nets):
-            kl_upper = upper_net.KL_term()
-            kl_upper_prior = upper_net.KL_prior_term()
-            log_pred = self.log_prediction_fn(
-                self.x, self.ys[t], t, self.no_train_samples)
-            kl_prior = tf.div(kl_lower_prior + kl_upper_prior, N)
-            kl_post = tf.div(kl_lower + kl_upper, N)
-            cost = tf.div(kl_post, kl_prior) - log_pred
+        for task_id in range(self.no_tasks):
+            log_pred = self.log_prediction_fn_training_loss(
+                self.x, self.ys, self.training_loss_classes[task_id], self.no_train_samples)
+            for ind, class_id in enumerate(self.training_loss_classes[task_id]):
+                kl_upper = self.upper_nets[class_id].KL_term()
+                if ind == 0:
+                    kl_upper_total = kl_upper
+                else:
+                    kl_upper_total += kl_upper
+            cost = tf.div(kl_lower + kl_upper, N) - log_pred
             costs.append(cost)
         return costs
 
@@ -421,22 +252,33 @@ class MFVI_NN(object):
             tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=targets))
         return log_lik
 
-    def init_session(self, head, task_idx, learning_rate, fix_upper_weights=False, classes = []):
+    def log_prediction_fn_training_loss(self, inputs, targets_input, training_loss_class_idx, no_samples):
+        for ind, class_id in enumerate(training_loss_class_idx):
+            pred_interm = self.prediction_fn(inputs, class_id, no_samples)
+            targets_interm = tf.tile(tf.expand_dims(targets_input[class_id], 0), [self.no_train_samples, 1, 1])
+            if ind == 0:
+                pred = pred_interm
+                targets = targets_interm
+            else:
+                pred = tf.concat([pred, pred_interm], axis=2)
+                targets = tf.concat([targets, targets_interm], axis=2)
+        log_lik = - tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=targets))
+        return log_lik
 
-        if fix_upper_weights:
-            #classes = [0]
-            vars_to_optimise = [self.lower_net.m, self.lower_net.v]
-            for class_id in classes:
-                print 'task', task_idx, 'class', class_id
-                vars_to_optimise.append(self.upper_nets[0].m[class_id])
-                vars_to_optimise.append(self.upper_nets[0].v[class_id])
+    def init_session(self, task_idx, learning_rate, training_classes = []):
 
-        else:
-            vars_to_optimise = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        #classes = [0]
+        vars_to_optimise = [self.lower_net.m, self.lower_net.v]
+        for class_id in training_classes:
+            #print 'task', task_idx, 'class', class_id
+            vars_to_optimise.append(self.upper_nets[class_id].m)
+            vars_to_optimise.append(self.upper_nets[class_id].v)
 
-        print 'variables to optimise:', vars_to_optimise
+        #vars_to_optimise = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        #print 'variables to optimise:', vars_to_optimise
 
-        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.costs[head], var_list=vars_to_optimise)
+        self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.training_loss[task_idx], var_list=vars_to_optimise)
 
         # Initializing the variables
         init = tf.global_variables_initializer()
@@ -448,8 +290,8 @@ class MFVI_NN(object):
     def close_session(self):
         self.sess.close()
 
-    def train(self, x_train, y_train, task_idx, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[], task_id_test=0):
+    def train(self, x_train, y_train, class_idx, task_id, prior_lower, prior_upper,
+              no_epochs=1000, batch_size=100, display_epoch=10, epoch_pause=[]):
 
         N = x_train.shape[0]
         if batch_size > N:
@@ -458,10 +300,12 @@ class MFVI_NN(object):
         costs = []
         feed_dict = {
             self.lower_net.m0: prior_lower[0],
-            self.lower_net.v0: (prior_lower[1]),
-            self.upper_nets[task_idx].m0: prior_upper[0][0],
-            self.upper_nets[task_idx].v0: (prior_upper[0][1]),
+            self.lower_net.v0: prior_lower[1],
             self.training_size: N}
+
+        for class_id in self.training_loss_classes[task_id]:
+            feed_dict[self.upper_nets[class_id].m0] = prior_upper[class_id][0]
+            feed_dict[self.upper_nets[class_id].v0] = prior_upper[class_id][1]
 
         # For visualising how weights change during training
         #epoch_pause = range(1,no_epochs,3)
@@ -485,30 +329,20 @@ class MFVI_NN(object):
                 batch_x = cur_x_train[start_ind:end_ind, :]
                 batch_y = cur_y_train[start_ind:end_ind, :]
                 feed_dict[self.x] = batch_x
-                feed_dict[self.ys[task_idx]] = batch_y
-                # Run optimization op (backprop) and cost op (to get loss value)
 
-                if task_id_test == 0:
-                    _, c = sess.run(
-                        [self.train_step, self.costs[task_idx]],
-                        feed_dict=feed_dict)
-                else:
-                    _, c = sess.run(
-                        [self.train_step, self.costs_new[task_idx]],
-                        feed_dict=feed_dict)
+                for class_id in self.training_loss_classes[task_id]:
+                    batch_input = np.zeros([end_ind-start_ind, 1])
+                    batch_input[:, 0] = batch_y[:, class_id]
+                    feed_dict[self.ys[class_id]] = batch_input
+
+                # Run optimization op (backprop) and cost op (to get loss value)
+                _, c_total = sess.run(
+                    [self.train_step, self.training_loss[task_id]],
+                    feed_dict=feed_dict)
 
                 # Compute average loss
-                avg_cost += c / total_batch
+                avg_cost += c_total / total_batch
                 # print i, total_batch, c
-
-                # TEST
-                #print 'starttest'
-                #inputs_3d = tf.tile(tf.expand_dims(batch_x, 0), [10, 1, 1])
-                #testvalue = self.sess.run(
-                #    [self.costs[0]],
-                #    feed_dict=feed_dict)
-                #print 'testvalue2', testvalue
-                # /TEST
 
             # Display logs per epoch step
             if epoch % display_epoch == 0:
@@ -517,14 +351,14 @@ class MFVI_NN(object):
             costs.append(avg_cost)
 
             if epoch in epoch_pause:
-                lower_post_epoch1, upper_post_epoch1 = self.get_weights(task_idx)
+                lower_post_epoch1, upper_post_epoch1 = self.get_weights(class_idx)
                 lower_post_epoch.append(lower_post_epoch1)
                 upper_post_epoch.append(upper_post_epoch1)
 
         print("Optimisation Finished!")
         return costs, lower_post_epoch, upper_post_epoch
 
-    def prediction(self, x_test, task_idx, batch_size=1000):
+    def prediction(self, x_test, task_idx=0, batch_size=1000):
         # Test model
         N = x_test.shape[0]
         batch_size = N if batch_size > N else batch_size
@@ -533,13 +367,19 @@ class MFVI_NN(object):
             start_ind = i * batch_size
             end_ind = np.min([(i + 1) * batch_size, N])
             batch_x = x_test[start_ind:end_ind, :]
+            #prediction = self.sess.run(
+            #    [self.preds[task_idx]],
+            #    feed_dict={self.x: batch_x})[0]
+
             prediction = self.sess.run(
-                [self.preds[task_idx]],
+                [self.preds],
                 feed_dict={self.x: batch_x})[0]
+
             if i == 0:
                 predictions = prediction
             else:
-                predictions = np.concatenate((predictions, prediction), axis=1)
+                predictions = np.concatenate((predictions, prediction), axis=2)
+
         return predictions
 
     def prediction_hist_plot(self, x_test, task_idx, batch_size=1000):
@@ -566,38 +406,40 @@ class MFVI_NN(object):
             feed_dict={self.x: x_test})[0]
         return prob
 
-    def get_weights(self, task_idx):
-        res = self.sess.run(
-            [self.lower_net.params, self.upper_nets[task_idx].params])
-        return res
+    def get_weights(self, class_idx):
+        lower = self.sess.run(self.lower_net.params)
+        upper = []
+        for class_id in class_idx:
+            upper_interm = self.sess.run(self.upper_nets[class_id].params)
+            upper.append(upper_interm)
+        #res = self.sess.run(
+        #    [self.lower_net.params, self.upper_nets[task_idx].params])
+        return (lower, upper)
 
-    def assign_weights(self, task_idx, lower_weights, upper_weights,
-                       lower_transform=np.log, upper_transform=np.log):
+    def assign_weights(self, class_idx, lower_weights, upper_weights):
         lower_net = self.lower_net
         self.sess.run(
             [lower_net.assign_m_op, lower_net.assign_v_op],
             feed_dict={
                 lower_net.new_m: lower_weights[0],
-                lower_net.new_v: (lower_weights[1])})
+                lower_net.new_v: lower_weights[1]})
 
-        if not isinstance(task_idx, (list,)):
-            task_idx = [task_idx]
+        if not isinstance(class_idx, (list,)):
+            class_idx = [class_idx]
             #upper_weights = [upper_weights]
 
-        for i, idx in enumerate(task_idx):
+        for i, idx in enumerate(class_idx):
             upper_net = self.upper_nets[idx]
 
-            # FIX RANGE 10 TO ONLY CLASSES OF INTEREST
-            for class_id in range(10):
-                assign_m_op = tf.assign(upper_net.m[class_id], upper_net.new_m[class_id])
-                self.sess.run(
-                    assign_m_op, feed_dict={
-                        upper_net.new_m: upper_weights[i][0]})
+            assign_m_op = tf.assign(upper_net.m, upper_net.new_m)
+            self.sess.run(
+                assign_m_op, feed_dict={
+                    upper_net.new_m: upper_weights[i][0]})
 
-                assign_v_op = tf.assign(upper_net.v[class_id], upper_net.new_v[class_id])
-                self.sess.run(
-                    assign_v_op, feed_dict={
-                        upper_net.new_v: upper_weights[i][1]})
+            assign_v_op = tf.assign(upper_net.v, upper_net.new_v)
+            self.sess.run(
+                assign_v_op, feed_dict={
+                    upper_net.new_v: upper_weights[i][1]})
 
     def reset_optimiser(self):
         optimizer_scope = tf.get_collection(

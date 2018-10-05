@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import utils
-from cla_models_multihead import MFVI_NN, ML_NN
+from cla_models_multihead import MFVI_NN
 from copy import deepcopy
 import pdb
 
@@ -35,9 +35,9 @@ class FactorManager():
         self.du_m = [np.ones(no_weights) * prior_mean for no_weights in no_upper_weights]
         self.du_v = [np.ones(no_weights) * log_func(prior_var) for no_weights in no_upper_weights]
 
-        #print 'testtsts', np.size(self.du_m[0]), no_upper_weights
+        #print 'factor manager du_m', np.size(self.du_m[0]), no_upper_weights
 
-    def compute_dist(self, dl_idx, cl_idx, task_idx, remove_data, remove_core, single_head=False):
+    def compute_dist(self, dl_idx, cl_idx, task_idx, remove_data, remove_core):
         # dl_n1 = np.sum(self.dl_n1[dl_idx, :], axis=0)
         # dl_n2 = np.sum(self.dl_n2[dl_idx, :], axis=0)
         # cl_n1 = np.sum(self.cl_n1[cl_idx, :], axis=0)
@@ -78,10 +78,15 @@ class FactorManager():
         #     u_m.append(u_m_i)
         #     u_v.append(u_v_i)
         #return (l_m, l_v, l_n1, l_n2), (u_m, u_v, u_n1, u_n2)
-        return (self.dl_m, self.dl_v), (self.du_m, self.du_v)
+
+        upper_mv = []
+        for class_ind in range(len(self.du_m)):
+            upper_mv.append([self.du_m[class_ind], self.du_v[class_ind]])
+
+        return (self.dl_m, self.dl_v), upper_mv
 
     def update_factor(self, post_l_mv, post_u_mv, cav_l_n, cav_u_n,
-                      task_idx, data_factor, core_factor, transform_func=np.exp, single_head=False):
+                      task_idx, data_factor, core_factor, transform_func=np.exp):
 
         #post_u_m = np.zeros(np.size(post_u_mv[0]))
         #post_u_v = np.zeros(np.size(post_u_mv[0]))
@@ -111,12 +116,14 @@ class FactorManager():
         #     self.cu_n1[head_idx] = f_u_n1
         #     self.cu_n2[head_idx] = f_u_n2
 
-        head = 0 if single_head else task_idx
+        #head = 0 if single_head else task_idx
 
         self.dl_m = deepcopy(post_l_mv[0])
         self.dl_v = deepcopy(post_l_mv[1])
-        self.du_m[head] = deepcopy(post_u_mv[0])
-        self.du_v[head] = deepcopy(post_u_mv[1])
+
+        for class_id in range(len(post_u_mv)):
+            self.du_m[class_id] = deepcopy(post_u_mv[class_id][0])
+            self.du_v[class_id] = deepcopy(post_u_mv[class_id][1])
 
 
 def init_post(cav_info, init_using_cav, ml_weights=None):
@@ -129,15 +136,12 @@ def init_post(cav_info, init_using_cav, ml_weights=None):
             post_mean = ml_weights[0]
         else:
             post_mean = np.random.normal(size=cav_mean.shape, scale=0.1)
-            #post_mean = np.zeros(cav_mean.shape)
         post_var = np.ones_like(cav_var) * (-6.0)
-        #post_var = np.ones_like(cav_var) / 128
-
         return [post_mean, post_var]
 
 
-def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
-                   coreset_size=0, batch_size=None, ml_init_option=False, path='sandbox/', calculate_acc=False, no_iters=1, learning_rate=0.005, epoch_pause=[], single_head=False, store_weights=False, fix_upper_weights = False):
+def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method, setting,
+                   coreset_size=0, batch_size=None, path='sandbox/', calculate_acc=False, no_iters=1, learning_rate=0.005, epoch_pause=[], store_weights=False):
     in_dim, out_dim = data_gen.get_dims()
     x_coresets, y_coresets = [], []
     x_testsets, y_testsets = [], []
@@ -152,31 +156,70 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
         x_testsets.append(x_test)
         y_testsets.append(y_test)
 
-    # creating model
-    no_heads = 1 if single_head else no_tasks
-    lower_size = [in_dim] + deepcopy(hidden_size)
-    upper_sizes = [[hidden_size[-1], out_dim] for i in range(no_heads)]
+    # Set up all the tasks
+    # 1: multi-head
+    # 2: like 1, but over all classes at test time
+    # 3: like 2, but over classes observed so far at test time
+    # 4: single-head
+    # 5: single-head, but only for classes observed so far
+    # setting = 5
 
-    model = MFVI_NN(lower_size, upper_sizes, fix_upper_weights=fix_upper_weights)
-    # we also create a model trained using maximum likelihood
-    #ml_model = ML_NN(lower_size, upper_sizes)
+    all_classes = range(data_gen.out_dim)
+    training_loss_classes = [] # Training loss function depends on these classes
+    training_classes = [] # Which classes' heads' weights change during training
+    test_classes = [] # Which classes to compare between at test time
+    observed_classes = [] # Which classes we have observed so far
+    for task_id in range(no_tasks):
+        # The data input classes for this task
+        data_classes = data_gen.classes[task_id]
+        observed_classes = observed_classes + data_classes
+
+        if setting == 1:
+            # Multi-head
+            training_loss_classes.append(data_classes)
+            training_classes.append(data_classes)
+            test_classes.append(data_classes)
+        elif setting == 2:
+            training_loss_classes.append(data_classes)
+            training_classes.append(data_classes)
+            test_classes.append(all_classes) # All classes
+        elif setting == 3:
+            training_loss_classes.append(data_classes)
+            training_classes.append(data_classes)
+            test_classes.append(observed_classes)  # Observed classes
+        elif setting == 4:
+            # Single-head
+            training_loss_classes.append(all_classes)
+            training_classes.append(all_classes)
+            test_classes.append(all_classes)
+        elif setting == 5:
+            training_loss_classes.append(observed_classes) # Observed classes
+            training_classes.append(observed_classes)
+            test_classes.append(observed_classes)
+
+    # creating model
+    no_heads = out_dim
+    lower_size = [in_dim] + deepcopy(hidden_size)
+    upper_sizes = [[hidden_size[-1], 1] for i in range(no_heads)]
+
+    model = MFVI_NN(lower_size, upper_sizes, training_loss_classes=training_loss_classes, data_classes=data_gen.classes)
     no_lower_weights = model.lower_net.no_weights
-    no_upper_weights = [net.no_weights for net in model.upper_nets] # THIS MAY NOT WORK ANYMORE IN MULTIHEAD CASE: TRY ... = [[net.no_weights] for net in ...]
-    no_upper_weights = [[10, 257]]
+    no_upper_weights = [net.no_weights for net in model.upper_nets]
+
     factory = FactorManager(no_tasks, no_lower_weights, no_upper_weights, prior_mean=0.0, prior_var=1.0)
 
     lower_post_epoch = []
     upper_post_epoch = []
     accuracies = []
     for task_id in range(no_tasks):
-        head = 0 if single_head else task_id
-        classes = data_gen.sets[task_id]
-        #classes = [0, 2]
+        # The data input classes for this task
+        data_classes = data_gen.classes[task_id]
+
         # init model
-        model.init_session(head, task_id, learning_rate, fix_upper_weights, classes)
+        model.init_session(task_id, learning_rate, training_classes[task_id])
+
         # get data
         x_train, y_train = x_trainsets[task_id], y_trainsets[task_id]
-        #x_test, y_test = x_testsets[task_id], y_testsets[task_id]
 
         # Set the readout head to train
         bsize = x_train.shape[0] if (batch_size is None) else batch_size
@@ -193,69 +236,29 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             # compute cavity
             lower_data_idx = range(task_id)
             lower_core_idx = range(task_id + 1)
-            lower_cav, upper_cav = factory.compute_dist(
-                lower_data_idx, lower_core_idx,
-                [task_id], remove_core=False, remove_data=True, single_head=single_head)
+            lower_cav, upper_cav = factory.compute_dist(lower_data_idx, lower_core_idx, [task_id], remove_core=False, remove_data=True)
             lower_mv = deepcopy([lower_cav[0], lower_cav[1]])
-            upper_mv = deepcopy([[upper_cav[0][0], upper_cav[1][0]]])
-
-            #print 'sizeof', np.size(upper_mv), np.size(upper_mv[0]), np.size(upper_mv[0][0]), np.size(upper_mv[0][0][0])
-
-            #lower_n = [lower_cav[2], lower_cav[3]]
-            #upper_n = [upper_cav[2][0], upper_cav[3][0]]
+            upper_mv = deepcopy(upper_cav)
             lower_n = []
             upper_n = []
 
-            # Initialisation options
-            if ml_init_option:
-                if task_id == 0 and i == 0:
-                    ## init using the maximum likeihood solution + small variances
-                    ml_model.init_session(task_id, learning_rate=0.002)
-                    ml_model.train(x_train, y_train, task_id,
-                                   no_epochs=100, batch_size=bsize)
-                    ml_lower, ml_upper = ml_model.get_weights(task_id)
-                    lower_post = init_post(lower_mv, init_using_cav=False, ml_weights=ml_lower)
-                    upper_post = init_post(upper_mv, init_using_cav=False, ml_weights=ml_upper)
-                    upper_transform = log_func
-                    lower_transform = log_func
+            #print 'sizeof', np.size(upper_mv), np.size(upper_mv[0]), np.size(upper_mv[0][0]), np.size(upper_mv[0][0][0])
 
-                elif i == 0:
-                    lower_post = init_post(lower_mv, init_using_cav=False)
-                    upper_post = init_post(upper_mv, init_using_cav=False)
-                    upper_transform = log_func
-                    lower_transform = log_func
+            # Small init or prior init only (removed ml init option)
+            if i == 0:
+                # init using the prior (previous posterior)
+                upper_post = deepcopy(upper_mv)
 
-                else:
-                    upper_transform = ide_func
-                    lower_transform = ide_func
+                # init using random means + small variances
+                lower_post = init_post(lower_mv, init_using_cav=False)
+                for class_id in training_classes[task_id]:
+                    upper_post[class_id] = deepcopy(init_post(upper_mv[class_id], init_using_cav=False))
 
-            else:
-                if i == 0:
-                    # init using the prior
-                    upper_post = deepcopy([init_post(upper_mv[0], init_using_cav=True)])
+                ## init using the prior or cavity
+                # lower_post = init_post(lower_mv, init_using_cav=True)
+                # upper_post = init_post(upper_mv, init_using_cav=True)
 
-                    # init using random means + small variances
-                    lower_post = init_post(lower_mv, init_using_cav=False)
-                    upper_post_interm = [init_post(upper_mv[0], init_using_cav=False)]
 
-                    for class_id in classes:
-                        upper_post[0][0][class_id] = upper_post_interm[0][0][class_id]
-                        upper_post[0][1][class_id] = upper_post_interm[0][1][class_id]
-
-                    #print 'after', upper_post[0]
-
-                    ## init using the prior or cavity
-                    # lower_post = init_post(lower_mv, init_using_cav=True)
-                    # upper_post = init_post(upper_mv, init_using_cav=True)
-
-                    upper_transform = ide_func
-                    lower_transform = ide_func
-
-                else:
-                    upper_transform = ide_func
-                    lower_transform = ide_func
-
-            upper_weights_const = False # Only change relevant classes' upper weights
             if calculate_acc:
                 no_epochs = 0
                 no_digits = data_gen.out_dim
@@ -263,7 +266,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                 if i == 0:
                     res = np.load(path + 'weights_%d.npz' % task_id)
                     lower_post = res['lower']
-                    upper_post = [res['upper']]
+                    upper_post = res['upper']
 
 
                     # if task_id == 0:
@@ -322,30 +325,16 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     # lower_post[1, :] = np.log(var_lower_new.reshape([-1]))
 
 
-                    lower_transform = ide_func
-                    upper_transform = ide_func
-
-            #print 'before', task_id, upper_post[0][9], upper_post[1][9]
-            #print 'sizes', np.size(lower_post), np.size(lower_post[0]), np.size(lower_post[0][0])
-
-            #print 'lower, vars, class 0, prior, before', lower_mv[1]
-            #print 'lower, vars, class 0, init, before', lower_post[1]
-
-            model.assign_weights(
-                head, lower_post, upper_post, ide_func, ide_func)
+            model.assign_weights(range(no_heads), lower_post, upper_post)
             # train on non-coreset data
             model.reset_optimiser()
-            _, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, head, lower_mv, upper_mv, no_epochs, bsize, epoch_pause=epoch_pause, task_id_test=task_id)
+            _, lower_post_epoch, upper_post_epoch = model.train(x_train, y_train, data_classes, task_id, lower_mv, upper_mv, no_epochs, bsize, epoch_pause=epoch_pause)
 
             # get params and update factor
-            lower_post, upper_post = model.get_weights(head)
-
-            #print 'lower, vars, class 0, after', lower_post[1]
-
-            #print 'after1', task_id, upper_post[0]
+            lower_post, upper_post = model.get_weights(range(no_heads))
 
             factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
-                                  data_factor=True, core_factor=False, single_head=single_head)
+                                  data_factor=True, core_factor=False)
 
             # loop through the coresets, for each find coreset factor
             if coreset_size > 0:
@@ -361,7 +350,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     lower_core_idx.remove(k)
                     lower_cav, upper_cav = factory.compute_dist(
                         lower_data_idx, lower_core_idx,
-                        [task_id], remove_core=True, remove_data=False, single_head=single_head)
+                        [task_id], remove_core=True, remove_data=False)
                     lower_mv = [lower_cav[0], lower_cav[1]]
                     upper_mv = [upper_cav[0][0], upper_cav[1][0]]
                     lower_n = [lower_cav[2], lower_cav[3]]
@@ -373,24 +362,20 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
                     # get params and update factor
                     lower_post, upper_post = model.get_weights(head)
                     factory.update_factor(lower_post, upper_post, lower_n, upper_n, task_id,
-                                          data_factor=False, core_factor=True, single_head=single_head)
+                                          data_factor=False, core_factor=True)
 
 
         #np.savez(path + 'const_upper/weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
         #np.savez('sandbox/weights_%d_epoch.npz' % task_id, lower=lower_post_epoch, upper=upper_post_epoch)
 
-
-
         # Make prediction
-        lower_post, upper_post = factory.compute_dist(
-            range(no_tasks), range(no_tasks), range(no_tasks), False, False, single_head=single_head)
+        lower_post, upper_post = factory.compute_dist(range(no_tasks), range(no_tasks), range(no_tasks), False, False)
         lower_mv = deepcopy([lower_post[0], lower_post[1]])
-        #upper_mv = [[upper_post[0][i], upper_post[1][i]] for i in range(no_heads)]
-        upper_mv = deepcopy([[upper_cav[0][0], upper_cav[1][0]]])
+        upper_mv = deepcopy(upper_post)
 
-        model.assign_weights(range(no_heads), lower_mv, upper_mv, ide_func, ide_func)
+        model.assign_weights(range(no_heads), lower_mv, upper_mv)
 
-        acc, pred_vec, pred_vec_true, pred_vec_total = utils.get_scores_output_pred(model, x_testsets, y_testsets, single_head=single_head, task_id=task_id)
+        acc, pred_vec, pred_vec_true, pred_vec_total = utils.get_scores_output_pred(model, x_testsets, y_testsets, test_classes, task_id=task_id)
         if task_id == 0:
             all_acc = np.array(acc)
         else:
@@ -417,27 +402,16 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method,
             accuracies = np.array(acc_interm)
         else:
             accuracies = np.vstack([accuracies, acc_interm])
-        # accuracies.append(acc_interm)
 
-        lower_post, upper_post = model.get_weights(head)
+        lower_post, upper_post = model.get_weights(range(no_heads))
         #store_weights = True
         store_pred_values = False
         if store_weights:
-            np.savez(path + 'weights_%d.npz' % task_id, lower=lower_post, upper=upper_post)
+            np.savez(path + 'weights_%d.npz' % task_id, lower=lower_post, upper=upper_post, classes=data_gen.classes, MNISTdigits=data_gen.sets, class_index_conversion=data_gen.class_list)
         if store_pred_values:
             np.savez(path + 'pred_%d.npz' % task_id, pred_true=pred_vec_true, pred=pred_vec, pred_total=pred_vec_total)
         #np.savez('sandbox/smallinitalways/accuracy_%d.npz' % task_id, acc=acc_interm, ind=[x+1 for x in epoch_pause])
 
-        #print 'stored', task_id, upper_post[0]
-
         model.close_session()
-
-
-    ## Print in a suitable format
-    #if no_tasks > 1:
-    #    for task_id in range(data_gen.max_iter):
-    #        for i in range(task_id+1):
-    #            print all_acc[task_id][i],
-    #        print ''
 
     return all_acc, accuracies
