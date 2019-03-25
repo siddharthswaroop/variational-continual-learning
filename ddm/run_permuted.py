@@ -32,7 +32,8 @@ class PermutedMnistGenerator():
         else:
             np.random.seed(self.cur_iter)
             perm_inds = range(self.X_train.shape[1])
-            np.random.shuffle(perm_inds)
+            if self.cur_iter > 0:
+                np.random.shuffle(perm_inds)
 
             # Retrieve train data
             next_x_train = deepcopy(self.X_train)
@@ -49,21 +50,21 @@ class PermutedMnistGenerator():
             return next_x_train, next_y_train, next_x_test, next_y_test
 
 hidden_size = [100, 100]
-batch_size = 256
-no_epochs = 300
+batch_size = 1024
+no_epochs = 10
 single_head = True
-num_tasks = 3
-
+num_tasks = 1
+"""
 # Run vanilla VCL
 tf.set_random_seed(12)
 np.random.seed(1)
 
 coreset_size = 0
 data_gen = PermutedMnistGenerator(num_tasks)
-vcl_result = vcl.run_vcl(hidden_size, no_epochs, data_gen, 
+vcl_result = vcl.run_vcl_calculate_acc(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size, single_head)
 print vcl_result
-"""
+
 # Run random coreset VCL
 tf.reset_default_graph()
 tf.set_random_seed(12)
@@ -84,10 +85,15 @@ data_gen = PermutedMnistGenerator(num_tasks)
 kcen_vcl_result = vcl.run_vcl(hidden_size, no_epochs, data_gen, 
     coreset.k_center, coreset_size, batch_size, single_head)
 print kcen_vcl_result
-
-# Plot average accuracy
-vcl_avg = np.nanmean(vcl_result, 1)
-rand_vcl_avg = np.nanmean(rand_vcl_result, 1)
-kcen_vcl_avg = np.nanmean(kcen_vcl_result, 1)
-utils.plot('results/permuted.jpg', vcl_avg, rand_vcl_avg, kcen_vcl_avg)
 """
+
+
+layer1 = [29, 54, 69, 78, 90, 92, 93, 96, 98, 99]
+layer2 = [11, 11, 11, 11, 11, 11, 11, 11, 11, 11]
+
+# # Plot average accuracy
+# vcl_avg = np.nanmean(vcl_result, 1)
+# rand_vcl_avg = np.nanmean(rand_vcl_result, 1)
+# kcen_vcl_avg = np.nanmean(kcen_vcl_result, 1)
+#utils.plot('sandbox/split.svg', vcl_avg, vcl_avg, vcl_avg)
+utils.plot_pruned_units('sandbox/pruning.svg', layer1, layer2)

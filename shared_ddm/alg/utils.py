@@ -35,7 +35,7 @@ def get_scores_hist_plot(model, x_testsets, y_testsets, no_repeats=1, single_hea
 
     return acc
 
-def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repeats=1, task_id=0):
+def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repeats=1, task_id=0, multi_head=False):
 
     acc = []
     pred_vec = []
@@ -43,14 +43,16 @@ def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repea
     pred_vec_total = []
 
     for i in range(len(x_testsets)):
-        #head = 0 if single_head else i
         x_test, y_test = x_testsets[i], y_testsets[i]
-        pred = model.prediction(x_test)
+        pred = model.prediction_prob(x_test)
         for j in range(no_repeats-1):
-            pred = pred + model.prediction(x_test)
+            pred = np.append(pred, model.prediction_prob(x_test), axis=1)
+            #pred = pred + model.prediction_prob(x_test)
+
         pred_mean_total = np.mean(pred, axis=1)
-        pred_mean = np.zeros(np.shape(pred_mean_total))
-        pred_mean[test_classes[i], :, :] = pred_mean_total[test_classes[i], :, :]
+        pred_mean = -1000000000*np.ones(np.shape(pred_mean_total))
+        heads = i if multi_head else task_id
+        pred_mean[test_classes[heads], :, :] = pred_mean_total[test_classes[heads], :, :]
         pred_y = np.argmax(pred_mean, axis=0)
         pred_y = pred_y[:, 0]
         y = np.argmax(y_test, axis=1)
@@ -68,11 +70,17 @@ def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repea
         for j in range(np.size(y)):
             sum_task_prob = sum_task_prob + pred_mean_total[y[j],j]
 
+            # if i == 1 and task_id == 2 and j == 1032:
+            #     print j, y[j], pred_y[j], pred_mean[2, j, 0], pred_mean[3,j,0], (pred_mean[3,j,0] - pred_mean[2,j,0])*100000.0
+            #     print pred[:,1,j,0], pred[:,2,j,0], pred[:,3,j,0]
+            #     print pred[2,:,j,0]
+            #     print pred[3,:,j,0]
+
             ## Print if we are predicting something other than digits from the most recently seen task
             #if not (pred_y[j] == 2*task_id or pred_y[j] == 2*task_id+1):
             #    print y[j], pred_y[j]
 
-        print 'task', i, 'avg_pred', sum_task_prob/np.size(y)
+        #print 'task', i, 'avg_pred', sum_task_prob/np.size(y)
 
         ## Compare pred values for certain tasks
         #if i == 1 and task_id == 2:
@@ -232,3 +240,27 @@ def plot(filename, vcl, rand_vcl, kcen_vcl):
 
     fig.savefig(filename, bbox_inches='tight')
     plt.close()
+
+def load_mnist(path, kind='train'):
+    # Code from https://github.com/zalandoresearch/fashion-mnist
+    import os
+    import gzip
+    import numpy as np
+
+    """Load MNIST data from `path`"""
+    labels_path = os.path.join(path,
+                               '%s-labels-idx1-ubyte.gz'
+                               % kind)
+    images_path = os.path.join(path,
+                               '%s-images-idx3-ubyte.gz'
+                               % kind)
+
+    with gzip.open(labels_path, 'rb') as lbpath:
+        labels = np.frombuffer(lbpath.read(), dtype=np.uint8,
+                               offset=8)
+
+    with gzip.open(images_path, 'rb') as imgpath:
+        images = np.frombuffer(imgpath.read(), dtype=np.uint8,
+                               offset=16).reshape(len(labels), 784)
+
+    return images, labels

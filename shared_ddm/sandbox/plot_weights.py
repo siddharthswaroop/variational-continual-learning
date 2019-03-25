@@ -145,18 +145,20 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
     # Plot difference of mean and variance for lower level weights
     plot_diff = False
 
+    plot_paper = False
+
     # Plot lower / upper level figures
     plot_lower = True
     plot_upper = True
 
-
+    # Load parameters
     res = np.load(path + 'weights_%d.npz' % 0)
     mnist_digits = res['MNISTdigits']
     classes = res['classes']
     class_index_conversion = res['class_index_conversion']
     no_tasks = len(classes)
     task_range = range(no_tasks)
-    #task_range = [0, 1, 2]
+    # task_range = [0, 1]
 
     for task_id in task_range:
 
@@ -204,23 +206,34 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
             no_cols = int(np.sqrt(no_hiddens[layer]))
             no_rows = int(no_hiddens[layer]/no_cols)
 
-            no_cols = 32
-            no_rows = 8
+            # no_cols = 25
+            # no_rows = 10
+            #
+            # if layer == 1:
+            #     no_cols = 20
+            #     no_rows = 5
+            no_cols = 20
+            no_rows = 5
 
             #neurons_interest = [114, 8, 122, 1]
             #print task_id, m_low[-1,neurons_interest], var_low[-1,neurons_interest]
 
             if plot_lower:
-                print "creating lower figures ..."
+                print "task %d lower figures ..." % task_id
 
-                fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(20, 5))
-                fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(20, 5))
+                if layer == 0:
+                    fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(no_cols, no_rows))
+                    fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(no_cols, no_rows))
+                if layer == 1:
+                    fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(20, 1.5))
+                    fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(20, 1.5))
 
-                fig0.suptitle("Task %d, Layer %d, Mean, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
-                fig1.suptitle("Task %d, Layer %d, Variance, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
+                #fig0.suptitle("Task %d, Layer %d, Mean, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+                #fig1.suptitle("Task %d, Layer %d, Variance, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
 
-                fig0.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
-                fig1.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
+                if not plot_paper:
+                    fig0.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+                    fig1.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
 
                 for i in range(no_rows):
                     for j in range(no_cols):
@@ -228,13 +241,22 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
                         ma = m_low[:in_dim, k].reshape(shape_dim)
                         va = var_low[:in_dim, k].reshape(shape_dim)
 
-                        axs0[i, j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m_min, vmax=m_max)
-                        axs0[i, j].set_xticks(np.array([]))
-                        axs0[i, j].set_yticks(np.array([]))
+                        if no_cols == 1 or no_rows == 1:
+                            axs0[i+j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m_min, vmax=m_max)
+                            axs0[i+j].set_xticks(np.array([]))
+                            axs0[i+j].set_yticks(np.array([]))
 
-                        axs1[i, j].matshow(va, cmap=matplotlib.cm.binary, vmin=v_min, vmax=v_max)
-                        axs1[i, j].set_xticks(np.array([]))
-                        axs1[i, j].set_yticks(np.array([]))
+                            axs1[i+j].matshow(va, cmap=matplotlib.cm.binary, vmin=v_min, vmax=v_max)
+                            axs1[i+j].set_xticks(np.array([]))
+                            axs1[i+j].set_yticks(np.array([]))
+                        else:
+                            axs0[i, j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m_min, vmax=m_max)
+                            axs0[i, j].set_xticks(np.array([]))
+                            axs0[i, j].set_yticks(np.array([]))
+
+                            axs1[i, j].matshow(va, cmap=matplotlib.cm.binary, vmin=v_min, vmax=v_max)
+                            axs1[i, j].set_xticks(np.array([]))
+                            axs1[i, j].set_yticks(np.array([]))
 
                 fig0.savefig(path + 'task%d_layer%d_mean.png' % (task_id+1, layer), bbox_inches='tight')
                 fig1.savefig(path + 'task%d_layer%d_var.png' % (task_id+1, layer), bbox_inches='tight')
@@ -245,43 +267,69 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
         #no_digits = 10
         no_params = no_hiddens[-1] * len(mnist_digits)
 
-        # POST fix_upper_weights
-        m_upper = np.transpose(m_upper)
-        var_upper = np.transpose(var_upper)
+        #print 'var_upper_bias', (var_upper[:, -1])
 
-        x_max = np.max(np.abs(m_upper[:no_hiddens[-1]]) + np.sqrt(var_upper[:no_hiddens[-1]]))
+        # POST fix_upper_weights
+        #m_upper = np.transpose(m_upper)
+        #var_upper = np.transpose(var_upper)
+
+        x_max = np.max(np.abs(m_upper[:,:no_hiddens[-1]]) + np.sqrt(var_upper[:,:no_hiddens[-1]]))
 
         #no_cols = int(np.sqrt(no_hiddens[-1]))
         #no_rows = int(no_hiddens[-1]/no_cols)
 
-        no_cols = 32
-        no_rows = 8
+        # no_cols = 25
+        # no_rows = 10
+        #
+        # if layer == 1:
+        #     no_cols = 20
+        #     no_rows = 5
+        no_cols = 20 # 25
+        no_rows = 5  # 8
 
-        x = np.linspace(-x_max, x_max, 1000)
+        number_points = 1000
+        if plot_paper:
+            number_points = 3000
+
+        x = np.linspace(-x_max, x_max, number_points)
 
         if plot_upper:
-            print  "creating upper figures ..."
+            print  "task %d upper figures ..." % task_id
 
-            fig, axs = plt.subplots(no_rows, no_cols, figsize=(20, 5))
-            fig.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (
-            task_id + 1, task_id + 1, -x_max, x_max))
-            fig.suptitle("Min = %f, Max = %f" % (-x_max, x_max))
+            fig, axs = plt.subplots(no_rows, no_cols, figsize=(no_cols, no_rows))
+            if not plot_paper:
+                fig.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (task_id + 1, task_id + 1, -x_max, x_max))
+                fig.suptitle("Min = %f, Max = %f" % (-x_max, x_max))
 
             no_plot_digits = (task_id+1)*2 if single_head else 2
-            no_plot_digits = no_digits
+            no_plot_digits = 10
             for i in range(no_rows):
                 for j in range(no_cols):
                     k = i * no_cols + j
-                    for digit in range(no_plot_digits):
-                        axs[i, j].plot(x, mlab.normpdf(x, m_upper[k][digit], np.sqrt(var_upper[k][digit])), label='%d' % class_index_conversion[digit])
-                    axs[i, j].set_xticks(np.array([]))
-                    axs[i, j].set_yticks(np.array([]))
-                    axs[i, j].set_ylim([0, 2.0])
-            axs[i,j].legend()
+
+                    if no_cols == 1 or no_rows == 1:
+                        for digit in range(no_plot_digits):
+                            axs[i+j].plot(x, mlab.normpdf(x, m_upper[digit][k], np.sqrt(var_upper[digit][k])), label='%d' % class_index_conversion[digit])
+                        axs[i+j].set_xticks(np.array([]))
+                        axs[i+j].set_yticks(np.array([]))
+                        if plot_paper:
+                            axs[i+j].set_ylim([0, 1.0])
+                        else:
+                            axs[i+j].set_ylim([0, 1.0])
+                    else:
+                        for digit in range(no_plot_digits):
+                            axs[i, j].plot(x, mlab.normpdf(x, m_upper[digit][k], np.sqrt(var_upper[digit][k])), label='%d' % class_index_conversion[digit])
+                        axs[i, j].set_xticks(np.array([]))
+                        axs[i, j].set_yticks(np.array([]))
+                        if plot_paper:
+                            axs[i,j].set_ylim([0, 1.0])
+                        else:
+                            axs[i,j].set_ylim([0, 1.0])
+            axs[i,0].legend()
             fig.savefig(path + 'task%d_upper.png' % (task_id+1), bbox_inches='tight')
 
             # Plot bias of upper weights
-            x_bias_max = np.max(np.abs(m_upper[-1])) + np.sqrt(np.max(var_upper[-1]))*2
+            x_bias_max = np.max(np.abs(m_upper[:,-1])) + np.sqrt(np.max(var_upper[:,-1]))*2
             #x_bias_max = 5.0
 
             no_cols = int(np.sqrt(no_hiddens[-1]))
@@ -290,11 +338,228 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
             x_bias = np.linspace(-x_bias_max, x_bias_max, 1000)
             plt.figure()
             for digit in range(no_plot_digits):
-                plt.plot(x_bias, mlab.normpdf(x_bias, m_upper[-1][digit], np.sqrt(var_upper[-1][digit])), label='%d' % class_index_conversion[digit])
-                plt.ylim([0, 3.0])
+                plt.plot(x_bias, mlab.normpdf(x_bias, m_upper[digit][-1], np.sqrt(var_upper[digit][-1])), label='%d' % class_index_conversion[digit])
+                if plot_paper:
+                    plt.ylim([0, 2.0])
+                else:
+                    plt.ylim([0, 2.0])
             plt.legend()
             plt.suptitle("Upper level bias after task %d, min = %f, max = %f" % (task_id+1, -x_bias_max, x_bias_max))
             plt.savefig(path + 'task%d_upper_bias.png' % (task_id+1))
+
+
+
+def visualise_layer_weights_specific_neurons(no_hiddens=[256], path="", single_head=False):
+
+    # Plot difference of mean and variance for lower level weights
+    plot_diff = False
+
+    plot_paper = True
+
+    # Plot lower / upper level figures
+    plot_lower = True
+    plot_upper = True
+
+    # Load parameters
+    res = np.load(path + 'weights_%d.npz' % 0)
+    mnist_digits = res['MNISTdigits']
+    classes = res['classes']
+    class_index_conversion = res['class_index_conversion']
+    no_tasks = len(classes)
+    task_range = range(no_tasks)
+    # task_range = [0, 1]
+
+    for task_id in task_range:
+
+        res = np.load(path + 'weights_%d.npz' % task_id)
+        lower = res['lower']
+        upper = res['upper']
+        m_upper = upper[:,0]
+        var_upper = np.exp(upper[:,1])
+
+        # Lower network
+        for layer in range(len(no_hiddens)):
+
+            if layer == 0:
+                in_dim = 784
+                in_size = [28, 28]
+                no_rows = 28
+                no_cols = 28
+                no_params = 0
+            else:
+                in_dim = no_hiddens[layer-1]
+
+            if plot_diff:
+                if task_id == 0:
+                    m_low_old = lower[0, no_params:no_params + (in_dim + 1) * no_hiddens[layer]]
+                    m_low = m_low_old
+                    var_low_old = np.exp(lower[1, no_params:no_params+(in_dim+1)*no_hiddens[layer]])
+                    var_low = var_low_old
+                else:
+                    m_low = lower[0, no_params:no_params+(in_dim+1)*no_hiddens[layer]] - m_low_old
+                    var_low = np.exp(lower[1, no_params:no_params+(in_dim+1)*no_hiddens[layer]]) - var_low_old
+                    m_low_old = lower[0, no_params:no_params + (in_dim + 1) * no_hiddens[layer]]
+                    var_low_old = np.exp(lower[1, no_params:no_params + (in_dim + 1) * no_hiddens[layer]])
+            else:
+                m_low = lower[0, no_params:no_params + (in_dim + 1) * no_hiddens[layer]]
+                var_low = np.exp(lower[1, no_params:no_params+(in_dim+1)*no_hiddens[layer]])
+
+            no_params = no_params + (in_dim + 1) * no_hiddens[layer]
+
+            m_low = m_low.reshape([in_dim+1, no_hiddens[layer]])
+            var_low = var_low.reshape([in_dim+1, no_hiddens[layer]])
+            m_min, m_max = np.min(m_low), np.max(m_low)
+            v_min, v_max = np.min(var_low), np.max(var_low)
+
+            shape_dim = [no_rows, no_cols]
+            no_cols = int(np.sqrt(no_hiddens[layer]))
+            no_rows = int(no_hiddens[layer]/no_cols)
+
+            # no_cols = 25
+            # no_rows = 10
+            #
+            # if layer == 1:
+            #     no_cols = 20
+            #     no_rows = 5
+            no_cols = 5
+            no_rows = 5
+
+            neurons_interest = [126, 183, 67, 63, 179]
+            #print task_id, m_low[-1,neurons_interest], var_low[-1,neurons_interest]
+
+            if plot_lower:
+                print "task %d lower figures ..." % task_id
+
+                if layer == 0 and task_id == 0:
+                    fig0, axs0 = plt.subplots(no_rows, no_cols, figsize=(no_cols+0.5, no_rows*1.4))
+                    fig1, axs1 = plt.subplots(no_rows, no_cols, figsize=(no_cols+0.5, no_rows*1.4))
+
+                #fig0.suptitle("Task %d, Layer %d, Mean, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+                #fig1.suptitle("Task %d, Layer %d, Variance, min = %f, max = %f" % (task_id+1, layer, np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
+
+                if not plot_paper:
+                    fig0.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(m_low)), np.max(np.absolute(m_low))))
+                    fig1.suptitle("Min = %f, Max = %f" % (np.min(np.absolute(var_low)), np.max(np.absolute(var_low))))
+
+                for i in [task_id]:
+                    for j in range(no_cols):
+                        k = i * no_cols + j
+                        ma = m_low[:in_dim, neurons_interest[j]].reshape(shape_dim)
+                        va = var_low[:in_dim, neurons_interest[j]].reshape(shape_dim)
+
+                        if no_cols == 1 or no_rows == 1:
+                            axs0[i+j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m_min, vmax=m_max)
+                            axs0[i+j].set_xticks(np.array([]))
+                            axs0[i+j].set_yticks(np.array([]))
+
+                            axs1[i+j].matshow(va, cmap=matplotlib.cm.binary, vmin=v_min, vmax=v_max)
+                            axs1[i+j].set_xticks(np.array([]))
+                            axs1[i+j].set_yticks(np.array([]))
+                        else:
+                            axs0[i, j].matshow(ma, cmap=matplotlib.cm.binary, vmin=m_min, vmax=m_max)
+                            axs0[i, j].set_xticks(np.array([]))
+                            axs0[i, j].set_yticks(np.array([]))
+
+                            axs1[i, j].matshow(va, cmap=matplotlib.cm.binary, vmin=v_min, vmax=v_max)
+                            axs1[i, j].set_xticks(np.array([]))
+                            axs1[i, j].set_yticks(np.array([]))
+
+
+
+
+        # Upper weights
+        no_digits = len(m_upper)
+        #no_digits = 10
+        no_params = no_hiddens[-1] * len(mnist_digits)
+
+        #print 'var_upper_bias', (var_upper[:, -1])
+
+        # POST fix_upper_weights
+        #m_upper = np.transpose(m_upper)
+        #var_upper = np.transpose(var_upper)
+
+        no_plot_digits = (task_id + 1) * 2 if single_head else 2
+        no_plot_digits = [2 * task_id, 2 * task_id + 1]
+
+        x_max = np.max(np.abs(m_upper[no_plot_digits,:no_hiddens[-1]]) + np.sqrt(var_upper[no_plot_digits,:no_hiddens[-1]]))
+
+        #no_cols = int(np.sqrt(no_hiddens[-1]))
+        #no_rows = int(no_hiddens[-1]/no_cols)
+
+        # no_cols = 25
+        # no_rows = 10
+        #
+        # if layer == 1:
+        #     no_cols = 20
+        #     no_rows = 5
+        no_cols = 5
+        no_rows = 5
+
+        number_points = 1000
+        if plot_paper:
+            number_points = 3000
+
+        x = np.linspace(-np.ceil(x_max), np.ceil(x_max), number_points)
+
+        if plot_upper:
+            print  "task %d upper figures ..." % task_id
+
+            matplotlib.rcParams.update({'font.size': 14})
+
+            if task_id == 0:
+                fig3, axs3 = plt.subplots(no_rows, no_cols, figsize=(11, 14))
+            if not plot_paper:
+                fig3.suptitle("Upper level weights for task %d (after task %d), min = %f, max = %f" % (task_id + 1, task_id + 1, -x_max, x_max))
+                fig3.suptitle("Min = %f, Max = %f" % (-x_max, x_max))
+
+
+            for i in [task_id]:
+                for j in range(no_cols):
+                    k = i * no_cols + j
+
+                    if no_cols == 1 or no_rows == 1:
+                        for digit in (no_plot_digits):
+                            axs3[i+j].plot(x, mlab.normpdf(x, m_upper[digit][neurons_interest[j]], np.sqrt(var_upper[digit][neurons_interest[j]])), label='%d' % class_index_conversion[digit])
+                        axs3[i+j].set_xticks(np.array([-np.ceil(x_max), np.ceil(x_max)]))
+                        axs3[i+j].set_yticks(np.array([]))
+                        if plot_paper:
+                            axs3[i+j].set_ylim([0, 1.0])
+                        else:
+                            axs3[i+j].set_ylim([0, 1.0])
+                    else:
+                        for digit in (no_plot_digits):
+                            axs3[i, j].plot(x, mlab.normpdf(x, m_upper[digit][neurons_interest[j]], np.sqrt(var_upper[digit][neurons_interest[j]])), label='%d' % class_index_conversion[digit], linewidth=5)
+                        axs3[i, j].set_xticks(np.array([-np.ceil(x_max), np.ceil(x_max)]))
+                        axs3[i, j].set_yticks(np.array([]))
+                        if plot_paper:
+                            axs3[i,j].set_ylim([0, 1.0])
+                        else:
+                            axs3[i,j].set_ylim([0, 1.0])
+            #axs[0].legend()
+
+
+            # # Plot bias of upper weights
+            # x_bias_max = np.max(np.abs(m_upper[no_plot_digits,-1])) + np.sqrt(np.max(var_upper[no_plot_digits,-1]))*2
+            # #x_bias_max = 5.0
+            #
+            # #no_cols = int(np.sqrt(no_hiddens[-1]))
+            # #no_rows = int(no_hiddens[-1]/no_cols)
+            #
+            # x_bias = np.linspace(-x_bias_max, x_bias_max, 1000)
+            # plt.figure()
+            # for digit in (no_plot_digits):
+            #     plt.plot(x_bias, mlab.normpdf(x_bias, m_upper[digit][-1], np.sqrt(var_upper[digit][-1])), label='%d' % class_index_conversion[digit])
+            #     if plot_paper:
+            #         plt.ylim([0, 2.0])
+            #     else:
+            #         plt.ylim([0, 2.0])
+            # plt.legend()
+            # plt.suptitle("Upper level bias after task %d, min = %f, max = %f" % (task_id+1, -x_bias_max, x_bias_max))
+
+    fig0.savefig(path + 'means.svg', bbox_inches='tight')
+    fig1.savefig(path + 'vars.svg', bbox_inches='tight')
+    fig3.savefig(path + 'upper.svg', bbox_inches='tight')
+    # plt.savefig(path + 'task%d_upper_bias.png' % (task_id+1))
 
 
 
@@ -726,12 +991,21 @@ def plot_pred_values(path=""):
 
 if __name__ == "__main__":
     epoch_pause = []
-    no_hiddens = [256]
+    no_hiddens = [100, 100]
 
-    path = 'singlehead/one_hidden_layer/300epochs/observed_classes/'
+    #path = 'singlehead/one_hidden_layer/1500epochs/batch_split_MNIST/'
+    # path = 'split_oddeven_MNIST/two_hidden_layers/option3/separate/2/'
+    #path = 'fashionMNIST/full_10_tasks/two_hidden_layers_300_epochs_random_order_2_neurons/batch/'
+    path = 'permuted_MNIST/two_hidden_layers/800epochs/batch/'
+    path = 'splitMNIST/multihead/one_hidden_layer_600_epochs/200neurons/run5/'
+    path = 'full_MNIST/two_hidden_layers/run2/'
+    path = 'permuted_MNIST/test/'
 
     print 'Local reparameterisation, plot weights'
 
     #visualise_layer_weights(no_hiddens, path="singlehead/test_long/", single_head=single_head)
+    #visualise_layer_weights(no_hiddens, path=path)
+
+    #no_hiddens = [200]
+    #path = 'splitMNIST/multihead/one_hidden_layer_600_epochs/200neurons/run2/neurons_of_interest/'
     visualise_layer_weights(no_hiddens, path=path)
-    #plot_pred_values(path=path)

@@ -69,14 +69,36 @@ def plot(filename, vcl, rand_vcl, kcen_vcl):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
 
-    fig = plt.figure(figsize=(7,3))
+    fig = plt.figure(figsize=(7,3)) ## (7,3) figsize for Permuted MNIST
     ax = plt.gca()
-    plt.plot(np.arange(len(vcl))+1, vcl, label='VCL', marker='o')
-    plt.plot(np.arange(len(rand_vcl))+1, rand_vcl, label='VCL + Random Coreset', marker='o')
-    plt.plot(np.arange(len(kcen_vcl))+1, kcen_vcl, label='VCL + K-center Coreset', marker='o')
+    plt.plot(np.arange(len(vcl))+1, vcl, label='New VCL', marker='o', color='y')
+    #plt.plot(np.arange(len(rand_vcl))+1, rand_vcl, label='VCL + Random Coreset', marker='o')
+    #plt.plot(np.arange(len(kcen_vcl))+1, kcen_vcl, label='VCL + K-center Coreset', marker='o')
     ax.set_xticks(range(1, len(vcl)+1))
+    ax.set_ylim([0.85, 1.01])
+    ax.set_yticks([0.85, 0.9, 0.95, 1.0])
     ax.set_ylabel('Average accuracy')
     ax.set_xlabel('\# tasks')
+    ax.legend()
+
+    fig.savefig(filename, bbox_inches='tight')
+    plt.close()
+
+def plot_pruned_units(filename, layer1, layer2):
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+
+    fig = plt.figure(figsize=(7,3)) ## (7,3) figsize for Permuted MNIST
+    ax = plt.gca()
+    plt.plot(np.arange(len(layer1))+1, layer1, label='Layer 1', marker='o')#, color='y')
+    plt.plot(np.arange(len(layer2))+1, layer2, label='Layer 2', marker='o')#, color='r')
+    #plt.plot(np.arange(len(rand_vcl))+1, rand_vcl, label='VCL + Random Coreset', marker='o')
+    #plt.plot(np.arange(len(kcen_vcl))+1, kcen_vcl, label='VCL + K-center Coreset', marker='o')
+    ax.set_xticks(range(1, len(layer1)+1))
+    ax.set_ylim([0, 100])
+    #ax.set_yticks([0.85, 0.9, 0.95, 1.0])
+    ax.set_ylabel('Number of unpruned units')
+    ax.set_xlabel('number of tasks')
     ax.legend()
 
     fig.savefig(filename, bbox_inches='tight')

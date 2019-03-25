@@ -10,6 +10,7 @@ def visualise_weights_ml(no_hiddens=256, path=""):
     res_0 = np.load(path + 'weights_ml_batch.npz')
     lower_0 = res_0['lower']
     m0 = lower_0[0, :]
+    # m0 = res_0['means'][0][0]
 
     upper_0 = res_0['upper']
     upper0 = upper_0[0]
@@ -19,6 +20,8 @@ def visualise_weights_ml(no_hiddens=256, path=""):
     task0 = []
     task1 = []
     task2 = []
+
+    print np.size(m0)
 
     for i in range(10):
         task0.append(np.argmax(np.abs(upper0)))
@@ -36,7 +39,7 @@ def visualise_weights_ml(no_hiddens=256, path=""):
     print np.reshape(task2, (-1,2))
 
 
-    #no_hiddens = 100
+    # no_hiddens = 100
     in_dim = 784
     in_size = [28, 28]
     no_params = in_dim * no_hiddens
@@ -139,7 +142,7 @@ def visualise_weights_vi_batch(no_hiddens=256, path=""):
 
 def visualise_weights(no_hiddens=[256], path=""):
 
-    no_tasks = 5
+    no_tasks = 1
     means = []
     variances = []
 
@@ -264,30 +267,30 @@ def visualise_weights(no_hiddens=[256], path=""):
                         axs1[i, j].set_yticks(np.array([]))
 
 
-        # Top layer plots
-        no_neurons = no_hiddens[-1]
-        no_cols = int(np.sqrt(no_neurons))
-        no_rows = int(np.sqrt(no_neurons))
-
-        mu = means[task_id][2][task_id]
-        var = np.exp(variances[task_id][2][task_id])
-
-        mu_max = np.max(np.abs(mu))
-        var_max = np.max(var)
-        xrange = mu_max + np.sqrt(var_max)
-        x = np.linspace(-xrange, xrange, 100)
-
-        fig, axs = plt.subplots(no_rows, no_cols, figsize=(10, 10))
-        fig.suptitle(
-            "upper level weights for task %d (after task %d), xmin = %f, xmax = %f" % (task_id+1, task_id+1, -xrange, xrange))
-        #fig0.suptitle("upper level weights for task %d (after task %d), xmin = %f, xmax = %f" % (task_id, task_id, xmin, xmax))
-        for i in range(no_rows):
-            for j in range(no_cols):
-                k = i * no_cols + j
-                axs[i,j].plot(x, mlab.normpdf(x, mu[k][0], np.sqrt(var[k][0])))
-                axs[i,j].plot(x, mlab.normpdf(x, mu[k][1], np.sqrt(var[k][1]))) # + np.exp(variances[task_id][3][task_id][1])
-                axs[i, j].set_xticks(np.array([]))
-                axs[i, j].set_yticks(np.array([]))
+        # # Top layer plots
+        # no_neurons = no_hiddens[-1]
+        # no_cols = int(np.sqrt(no_neurons))
+        # no_rows = int(np.sqrt(no_neurons))
+        #
+        # mu = means[task_id][2][task_id]
+        # var = np.exp(variances[task_id][2][task_id])
+        #
+        # mu_max = np.max(np.abs(mu))
+        # var_max = np.max(var)
+        # xrange = mu_max + np.sqrt(var_max)
+        # x = np.linspace(-xrange, xrange, 100)
+        #
+        # fig, axs = plt.subplots(no_rows, no_cols, figsize=(10, 10))
+        # fig.suptitle(
+        #     "upper level weights for task %d (after task %d), xmin = %f, xmax = %f" % (task_id+1, task_id+1, -xrange, xrange))
+        # #fig0.suptitle("upper level weights for task %d (after task %d), xmin = %f, xmax = %f" % (task_id, task_id, xmin, xmax))
+        # for i in range(no_rows):
+        #     for j in range(no_cols):
+        #         k = i * no_cols + j
+        #         axs[i,j].plot(x, mlab.normpdf(x, mu[k][0], np.sqrt(var[k][0])))
+        #         axs[i,j].plot(x, mlab.normpdf(x, mu[k][1], np.sqrt(var[k][1]))) # + np.exp(variances[task_id][3][task_id][1])
+        #         axs[i, j].set_xticks(np.array([]))
+        #         axs[i, j].set_yticks(np.array([]))
 
     plt.show()
 
@@ -665,9 +668,9 @@ def check_weight_pruning(no_hiddens=256, path=""):
 if __name__ == "__main__":
     #epoch_pause = [20, 80, 140, 142, 144, 146, 148, 150]
     print 'VCL plot weights'
-    no_hiddens = [256,256]
+    no_hiddens = [100,100]
     # check_weight_pruning(path='small_init/')
-    visualise_weights(no_hiddens)
+    visualise_weights_ml(no_hiddens, path="full_MNIST/run2/")
     # check_weight_pruning(no_hiddens)
     # visualise_weights_epoch(no_hiddens,epoch_pause)
     # visualise_weights_vi_batch(no_hiddens)

@@ -427,9 +427,9 @@ class MFVI_NN(Cla_NN):
     def create_weights(self, in_dim, hidden_size, out_dim, prev_weights, prev_variances):
         #tf.set_random_seed(3)
 
-        m_std = 0.1
-        W_v_log = -6.0
-        b_v_log = -6.0
+        #m_std = 0.1
+        #W_v_log = -6.0
+        #b_v_log = -6.0
         hidden_size = deepcopy(hidden_size)
         hidden_size.append(out_dim)
         hidden_size.insert(0, in_dim)
@@ -446,21 +446,34 @@ class MFVI_NN(Cla_NN):
         for i in range(no_layers-1):
             din = hidden_size[i]
             dout = hidden_size[i+1]
-            if prev_weights is None:
-                Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
-                bi_m_val = tf.truncated_normal([dout], stddev=m_std)
-                Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
-                bi_v_val = tf.constant(b_v_log, shape=[dout])
+            # if prev_weights is None:
+            #     Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
+            #     bi_m_val = tf.truncated_normal([dout], stddev=m_std)
+            #     Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+            #     bi_v_val = tf.constant(b_v_log, shape=[dout])
+            # else:
+            #     Wi_m_val = prev_weights[0][i]
+            #     bi_m_val = prev_weights[1][i]
+            #     if prev_variances is None:
+            #         #W_v_log = np.log(2.0 / (din + dout), dtype=np.float32)
+            #         Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+            #         bi_v_val = tf.constant(b_v_log, shape=[dout])
+            #     else:
+            #         Wi_v_val = prev_variances[0][i]
+            #         bi_v_val = prev_variances[1][i]
+
+            if prev_variances is None:
+                #Wi_m_val = tf.constant(0.0, shape=[din, dout])
+                #bi_m_val = tf.constant(0.0, shape=[dout])
+                Wi_m_val = prev_weights[0][i]
+                bi_m_val = prev_weights[1][i]
+                Wi_v_val = tf.constant(-6.0, shape=[din, dout])
+                bi_v_val = tf.constant(-6.0, shape=[dout])
             else:
                 Wi_m_val = prev_weights[0][i]
                 bi_m_val = prev_weights[1][i]
-                if prev_variances is None:
-                    #W_v_log = np.log(2.0 / (din + dout), dtype=np.float32)
-                    Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
-                    bi_v_val = tf.constant(b_v_log, shape=[dout])
-                else:
-                    Wi_v_val = prev_variances[0][i]
-                    bi_v_val = prev_variances[1][i]
+                Wi_v_val = prev_variances[0][i]
+                bi_v_val = prev_variances[1][i]
 
             Wi_m = tf.Variable(Wi_m_val)
             bi_m = tf.Variable(bi_m_val)
@@ -471,41 +484,54 @@ class MFVI_NN(Cla_NN):
             W_v.append(Wi_v)
             b_v.append(bi_v)
 
-        # if there are previous tasks
-        if prev_weights is not None and prev_variances is not None:
-            prev_Wlast_m = prev_weights[2]
-            prev_blast_m = prev_weights[3]
-            prev_Wlast_v = prev_variances[2]
-            prev_blast_v = prev_variances[3]
-            no_prev_tasks = len(prev_Wlast_m)
-            for i in range(no_prev_tasks):
-                W_i_m = prev_Wlast_m[i]
-                b_i_m = prev_blast_m[i]
-                Wi_m = tf.Variable(W_i_m)
-                bi_m = tf.Variable(b_i_m)
-
-                W_i_v = prev_Wlast_v[i]
-                b_i_v = prev_blast_v[i]
-                Wi_v = tf.Variable(W_i_v)
-                bi_v = tf.Variable(b_i_v)
-                
-                W_last_m.append(Wi_m)
-                b_last_m.append(bi_m)
-                W_last_v.append(Wi_v)
-                b_last_v.append(bi_v)
+        # # if there are previous tasks
+        # if prev_weights is not None and prev_variances is not None:
+        #     prev_Wlast_m = prev_weights[2]
+        #     prev_blast_m = prev_weights[3]
+        #     prev_Wlast_v = prev_variances[2]
+        #     prev_blast_v = prev_variances[3]
+        #     no_prev_tasks = len(prev_Wlast_m)
+        #     for i in range(no_prev_tasks):
+        #         W_i_m = prev_Wlast_m[i]
+        #         b_i_m = prev_blast_m[i]
+        #         Wi_m = tf.Variable(W_i_m)
+        #         bi_m = tf.Variable(b_i_m)
+        #
+        #         W_i_v = prev_Wlast_v[i]
+        #         b_i_v = prev_blast_v[i]
+        #         Wi_v = tf.Variable(W_i_v)
+        #         bi_v = tf.Variable(b_i_v)
+        #
+        #         W_last_m.append(Wi_m)
+        #         b_last_m.append(bi_m)
+        #         W_last_v.append(Wi_v)
+        #         b_last_v.append(bi_v)
 
         din = hidden_size[-2]
         dout = hidden_size[-1]
 
-        # if point estimate is supplied
-        if prev_weights is not None and prev_variances is None:
-            Wi_m_val = prev_weights[2][0]
+        # # if point estimate is supplied
+        # if prev_weights is not None and prev_variances is None:
+        #     Wi_m_val = prev_weights[2][0]
+        #     bi_m_val = prev_weights[3][0]
+        # else:
+        #     Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
+        #     bi_m_val = tf.truncated_normal([dout], stddev=m_std)
+        # Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
+        # bi_v_val = tf.constant(b_v_log, shape=[dout])
+
+        if prev_variances is None:
+            #Wi_m_val = tf.constant(0.0, shape=[din, dout])
+            #bi_m_val = tf.constant(0.0, shape=[dout])
+            Wi_m_val = prev_weights[2][0].reshape([din,dout])
             bi_m_val = prev_weights[3][0]
+            Wi_v_val = tf.constant(-6.0, shape=[din, dout])
+            bi_v_val = tf.constant(-6.0, shape=[dout])
         else:
-            Wi_m_val = tf.truncated_normal([din, dout], stddev=m_std)
-            bi_m_val = tf.truncated_normal([dout], stddev=m_std)
-        Wi_v_val = tf.constant(W_v_log, shape=[din, dout])
-        bi_v_val = tf.constant(b_v_log, shape=[dout])
+            Wi_m_val = prev_weights[2][0].reshape([din,dout])
+            bi_m_val = prev_weights[3][0]
+            Wi_v_val = prev_variances[2][0].reshape([din,dout])
+            bi_v_val = prev_variances[3][0]
 
         Wi_m = tf.Variable(Wi_m_val)
         bi_m = tf.Variable(bi_m_val)
