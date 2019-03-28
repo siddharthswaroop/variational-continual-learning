@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-import pdb
+#import pdb
 
 def merge_coresets(x_coresets, y_coresets):
     merged_x, merged_y = x_coresets[0], y_coresets[0]
@@ -11,50 +11,39 @@ def merge_coresets(x_coresets, y_coresets):
         merged_y = np.vstack((merged_y, y_coresets[i]))
     return merged_x, merged_y
 
-# For plotting histogram of activations
-def get_scores_hist_plot(model, x_testsets, y_testsets, no_repeats=1, single_head=False, path=""):
-    acc = []
-    for i in range(len(x_testsets)):
-        head = 0 if single_head else i
-        x_test, y_test = x_testsets[i], y_testsets[i]
-        pred = model.prediction_hist_plot(x_test, head)
-        for j in range(no_repeats-1):
-            pred = pred + model.prediction_hist_plot(x_test, head)
-
-        y = np.argmax(y_test, axis=1)
-        hist_plot = []
-        for i in range(np.size(y)):
-            pred_test = pred[:,i,y[i]]
-            hist_plot.append(pred_test)
-        hist_plot = np.array(hist_plot)
-        hist_plot = hist_plot.reshape([-1])
-        plt.figure(1)
-        plt.hist(hist_plot, bins=500, histtype='stepfilled')
-        plt.suptitle('Histogram of activations (upper layer)')
-        plt.savefig(path + 'hist_test.png')
-
-    return acc
-
+# Get test accuracies from model
 def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repeats=1, task_id=0, multi_head=False):
 
     acc = []
-    pred_vec = []
-    pred_vec_true = []
-    pred_vec_total = []
+    # pred_vec = []
+    # pred_vec_true = []
+    # pred_vec_total = []
 
+    # Go over each task's testset
     for i in range(len(x_testsets)):
         x_test, y_test = x_testsets[i], y_testsets[i]
+
+        # Output from model
         pred = model.prediction_prob(x_test)
+
         for j in range(no_repeats-1):
             pred = np.append(pred, model.prediction_prob(x_test), axis=1)
-            #pred = pred + model.prediction_prob(x_test)
 
+        # Mean over the different Monte Carlo models
         pred_mean_total = np.mean(pred, axis=1)
+
+        heads = i if multi_head else task_id  # Different for multi-head and single-head
+        # test_classes[heads] holds which classes we are predicting between
+        # We are only interested in finding which of these classes has maximum prediction output from model
+        # We therefore set all the other classes to have a large negative value: this is pred_mean
         pred_mean = -1000000000*np.ones(np.shape(pred_mean_total))
-        heads = i if multi_head else task_id
         pred_mean[test_classes[heads], :, :] = pred_mean_total[test_classes[heads], :, :]
+
+        # Predicted class
         pred_y = np.argmax(pred_mean, axis=0)
         pred_y = pred_y[:, 0]
+
+        # True class
         y = np.argmax(y_test, axis=1)
 
         # print 'pred', np.shape(pred)
@@ -66,9 +55,9 @@ def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repea
 
         #print 'pred mean', i, model.prediction_prob(x_test, head)
 
-        sum_task_prob = 0.0
-        for j in range(np.size(y)):
-            sum_task_prob = sum_task_prob + pred_mean_total[y[j],j]
+        # sum_task_prob = 0.0
+        # for j in range(np.size(y)):
+            # sum_task_prob = sum_task_prob + pred_mean_total[y[j],j]
 
             # if i == 1 and task_id == 2 and j == 1032:
             #     print j, y[j], pred_y[j], pred_mean[2, j, 0], pred_mean[3,j,0], (pred_mean[3,j,0] - pred_mean[2,j,0])*100000.0
@@ -88,10 +77,11 @@ def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, no_repea
         #        print y[j], pred_y[j]
         #        print pred_vec_total_task1_interm[j], pred_vec_total_task2_interm[j]
 
+        # Calculate test accuracy
         cur_acc = len(np.where((pred_y - y) == 0)[0]) * 1.0 / y.shape[0]
         acc.append(cur_acc)
 
-    return acc, pred_vec, pred_vec_true, pred_vec_total
+    return acc#, pred_vec, pred_vec_true, pred_vec_total
 
 def get_scores_splitMNIST_output_pred(model, x_testsets, y_testsets, no_repeats=1, single_head=False, task_id=0):
     acc = []
@@ -112,7 +102,7 @@ def get_scores_splitMNIST_output_pred(model, x_testsets, y_testsets, no_repeats=
         x_test, y_test = x_testsets[i], y_testsets[i]
         pred = model.prediction(x_test, head)
         for j in range(no_repeats-1):
-            pred = pred + model.prediction_prob(x_test, head)
+            pred = pred + model.prediction_prob(x_test)
         pred_mean = np.mean(pred, axis=0)
         pred_y = np.argmax(pred_mean, axis=1)
         y = np.argmax(y_test, axis=1)
@@ -200,7 +190,7 @@ def get_scores(model, x_testsets, y_testsets, no_repeats=1, single_head=False):
         x_test, y_test = x_testsets[i], y_testsets[i]
         pred = model.prediction(x_test, head)
         for j in range(no_repeats-1):
-            pred = pred + model.prediction_prob(x_test, head)
+            pred = pred + model.prediction_prob(x_test)
         pred_mean = np.mean(pred, axis=0)
         pred_y = np.argmax(pred_mean, axis=1)
         y = np.argmax(y_test, axis=1)

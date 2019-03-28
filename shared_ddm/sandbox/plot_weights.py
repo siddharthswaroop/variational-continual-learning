@@ -144,7 +144,6 @@ def visualise_layer_weights(no_hiddens=[256], path="", single_head=False):
 
     # Plot difference of mean and variance for lower level weights
     plot_diff = False
-
     plot_paper = False
 
     # Plot lower / upper level figures
@@ -999,7 +998,7 @@ if __name__ == "__main__":
     path = 'permuted_MNIST/two_hidden_layers/800epochs/batch/'
     path = 'splitMNIST/multihead/one_hidden_layer_600_epochs/200neurons/run5/'
     path = 'full_MNIST/two_hidden_layers/run2/'
-    path = 'permuted_MNIST/test/'
+    path = 'test/'
 
     print 'Local reparameterisation, plot weights'
 

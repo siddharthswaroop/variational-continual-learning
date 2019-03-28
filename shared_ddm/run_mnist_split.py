@@ -8,7 +8,7 @@ import vcl
 import coreset
 from utils import load_mnist
 from copy import deepcopy
-import pickle
+#import pickle
 
 class MnistGenerator():
     def __init__(self):
@@ -199,61 +199,6 @@ class FullMnistGenerator():
                     next_y_test = np.vstack((next_y_test, next_y_test_interm))
 
                 # print self.sets[self.cur_iter][class_index], len(next_x_train)
-
-            self.cur_iter += 1
-
-            return next_x_train, next_y_train, next_x_test, next_y_test
-
-class PermutedMnistGeneratorOld():
-    def __init__(self, max_iter=10):
-        f = gzip.open('data/mnist.pkl.gz', 'rb')
-        train_set, valid_set, test_set = cPickle.load(f)
-        f.close()
-
-        self.X_train = np.vstack((train_set[0], valid_set[0]))
-        self.Y_train = np.hstack((train_set[1], valid_set[1]))
-        self.X_test = test_set[0]
-        self.Y_test = test_set[1]
-        self.max_iter = max_iter
-        self.cur_iter = 0
-
-
-        self.out_dim = 10*self.max_iter # Total number of unique classes
-        self.class_list = range(10*self.max_iter) # List of unique classes being considered, in the order they appear
-        # self.classes is the classes (with correct indices for training/testing) of interest at each task_id
-        self.classes = []
-        for iter in range(self.max_iter):
-            self.classes.append(range(0+10*iter,10+10*iter))
-
-        self.sets = self.classes
-
-    def get_dims(self):
-        # Get data input and output dimensions
-        return self.X_train.shape[1], self.out_dim
-
-    def next_task(self):
-        if self.cur_iter >= self.max_iter:
-            raise Exception('Number of tasks exceeded!')
-        else:
-            np.random.seed(self.cur_iter)
-            perm_inds = range(self.X_train.shape[1])
-            if self.cur_iter > 0:
-                np.random.shuffle(perm_inds)
-
-            # Retrieve train data
-            next_x_train = deepcopy(self.X_train)
-            next_x_train = next_x_train[:,perm_inds]
-
-            # Initialise next_y_train to zeros, then change relevant entries to ones, and then stack
-            next_y_train = np.zeros((len(next_x_train), self.out_dim))
-            next_y_train[:,0+10*self.cur_iter:10+10*self.cur_iter] = np.eye(10)[self.Y_train]
-
-            # Retrieve test data
-            next_x_test = deepcopy(self.X_test)
-            next_x_test = next_x_test[:,perm_inds]
-
-            next_y_test = np.zeros((len(next_x_test), self.out_dim))
-            next_y_test[:,0+10*self.cur_iter:10+10*self.cur_iter] = np.eye(10)[self.Y_test]
 
             self.cur_iter += 1
 
@@ -1169,29 +1114,17 @@ for i in range(no_repeats):
     # if i == 4:
     #     path = 'sandbox/full_MNIST/two_hidden_layers/run5/'
 
-    #path = 'sandbox/full_MNIST/two_hidden_layers/run1/'
-    if i == 0:
-        path = 'sandbox/permuted_MNIST/two_hidden_layers/800epochs/run6/'
-    if i == 1:
-        path = 'sandbox/permuted_MNIST/two_hidden_layers/800epochs/run2/'
-    if i == 2:
-        path = 'sandbox/permuted_MNIST/two_hidden_layers/800epochs/run3/'
-    if i == 3:
-        path = 'sandbox/permuted_MNIST/two_hidden_layers/800epochs/run4/'
-    if i == 4:
-        path = 'sandbox/permuted_MNIST/two_hidden_layers/800epochs/run5/'
+    path = 'sandbox/test/'
 
-    path = 'sandbox/permuted_MNIST/test/'
     hidden_size = [100, 100]
     batch_size = 1024
-    no_epochs = 100
-    no_iters = 1#50
+    no_epochs = 3
     option = 4
     # batch_split_oddeven_task_max = 5
-    permuted_max_iter = 1
+    permuted_max_iter = 2
 
     tf.reset_default_graph()
-    random_seed = 10 + i + 5
+    random_seed = i
     tf.set_random_seed(random_seed+1)
     np.random.seed(random_seed)
 
@@ -1236,79 +1169,79 @@ for i in range(no_repeats):
     if option == 1:
         coreset_size = 0
         data_gen = MnistGenerator()
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Coreset
     elif option == 2:
         coreset_size = 200
         data_gen = MnistGenerator()
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Full MNIST
     if option == 3:
         coreset_size = 0
         data_gen = FullMnistGenerator()
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Permuted MNIST
     if option == 4:
         setting = 4
         coreset_size = 0
         data_gen = PermutedMnistGenerator(max_iter=permuted_max_iter, random_seed=random_seed)
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Split odd/even MNIST
     if option == 5:
         coreset_size = 0
         data_gen = SplitOddEvenMnistGenerator()
         vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Batch split odd/even MNIST
     if option == 6:
         coreset_size = 0
         data_gen = BatchSplitOddEvenMnistGenerator(task_max=batch_split_oddeven_task_max)
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Fashion MNIST
     if option == 7:
         coreset_size = 0
         data_gen = FashionMnistGenerator()
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # split Fashion/Digit MNIST
     if option == 8:
         coreset_size = 0
         data_gen = FashionDigitMnistGenerator()
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Batch split Fasion/Digit MNIST
     if option == 9:
         coreset_size = 0
         data_gen = BatchFashionDigitMnistGenerator(task_max=10)
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Split Permuted MNIST
     if option == 10:
         coreset_size = 0
         data_gen = SplitPermutedMnistGenerator(max_iter=permuted_max_iter, random_seed=random_seed)
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
     # Batch Permuted MNIST
     if option == 11:
         coreset_size = 0
         data_gen = BatchPermutedMnistGenerator(max_iter=permuted_max_iter)
-        vcl_result, _ = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
-            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, no_iters=no_iters, store_weights=store_weights)
+        vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+            coreset.rand_from_batch, setting, coreset_size, batch_size, path, calculate_acc, store_weights=store_weights)
 
 
     if vcl_avg is None:
