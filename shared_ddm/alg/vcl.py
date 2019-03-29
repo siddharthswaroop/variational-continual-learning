@@ -115,7 +115,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method, setting,
     lower_size = [in_dim] + deepcopy(hidden_size)
     upper_sizes = [[hidden_size[-1], 1] for i in range(no_heads)]
 
-    model = MFVI_NN(lower_size, upper_sizes, training_loss_classes=training_loss_classes, data_classes=data_gen.classes, use_float64=False) # TODO: Change use_float64 for split vs permuted MNIST
+    model = MFVI_NN(lower_size, upper_sizes, training_loss_classes=training_loss_classes, data_classes=data_gen.classes, use_float64=True) # TODO: Change use_float64 for split vs permuted MNIST
     no_lower_weights = model.lower_net.no_weights
     no_upper_weights = [net.no_weights for net in model.upper_nets]
 
@@ -152,7 +152,7 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method, setting,
 
         # Initialise using random means + small variances
         lower_weights = initialise_weights(lower_weights_prior)
-        upper_weights = np.empty_like(upper_weights_prior)
+        upper_weights = deepcopy(upper_weights_prior)
         for class_id in training_classes[task_id]:
             upper_weights[class_id] = deepcopy(initialise_weights(upper_weights_prior[class_id]))
 
@@ -382,9 +382,9 @@ def run_vcl_shared(hidden_size, no_epochs, data_gen, coreset_method, setting,
 
         # Save model weights after training
         if store_weights:
-            np.savez(path + 'weights_%d.npz' % i, lower=lower_weights, upper=upper_weights, classes=data_gen.classes,
+            np.savez(path + 'weights_%d.npz' % task_id, lower=lower_weights, upper=upper_weights, classes=data_gen.classes,
                      MNISTdigits=data_gen.sets, class_index_conversion=data_gen.class_list)
-            np.savez(path + 'costs_%d.npz' % i, avg_cost=avg_cost, avg_lik_cost=avg_lik_cost)
+            np.savez(path + 'costs_%d.npz' % task_id, avg_cost=avg_cost, avg_lik_cost=avg_lik_cost)
 
         # Test-time: load weights, and calculate test accuracy
         lower_weights, upper_weights = weights_storage.return_weights()

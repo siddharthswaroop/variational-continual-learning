@@ -30,8 +30,8 @@ class MnistGenerator():
         task5 = [8, 9]
         self.sets = [task1, task2, task3, task4, task5]
 
-        # Full MNIST
-        self.sets = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+        # # Full MNIST
+        # self.sets = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
 
         # # Odd/even MNIST
         # task1 = [0, 2, 4, 6, 8]
@@ -1117,9 +1117,9 @@ for i in range(no_repeats):
     path = 'sandbox/test/'
 
     hidden_size = [100, 100]
-    batch_size = 1024
-    no_epochs = 3
-    option = 4
+    batch_size = 256#1024
+    no_epochs = 10
+    option = 1
     # batch_split_oddeven_task_max = 5
     permuted_max_iter = 2
 
@@ -1163,7 +1163,7 @@ for i in range(no_repeats):
     # 5: single-head, but only for classes observed so far
     # 6: single-head [observed classes] during training, but multi-head during testing
     # 7: like 4, but for split odd/even MNIST (more epochs for task 1, fewer epochs for task 5)
-    setting = 4
+    setting = 1
 
     # Split MNIST
     if option == 1:
