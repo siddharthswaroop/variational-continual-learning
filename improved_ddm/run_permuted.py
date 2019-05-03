@@ -6,6 +6,7 @@ import sys
 sys.path.extend(['alg/'])
 import vcl
 import coreset
+import utils
 from copy import deepcopy
 
 
@@ -68,24 +69,27 @@ class PermutedMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
+    def reset(self):
+        self.cur_iter = 0
+
 
 store_weights = True        # Store weights after training on each task (for plotting later)
 multi_head = False          # Multi-head or single-head network
 
 hidden_size = [100, 100]    # Size and number of hidden layers
 batch_size = 1024           # Batch size
-no_epochs = 2               # Number of training epochs per task
+no_epochs = 800             # Number of training epochs per task
+permuted_num_tasks = 10
 
+
+# No coreset
 tf.reset_default_graph()
-random_seed = 0
+random_seed = 1
 tf.set_random_seed(random_seed+1)
 np.random.seed(random_seed)
 
-permuted_num_tasks = 10
-data_gen = PermutedMnistGenerator(max_iter=permuted_num_tasks, random_seed=random_seed)
-
-# No coreset
 path = 'model_storage/permuted/'    # Path where to store files
+data_gen = PermutedMnistGenerator(max_iter=permuted_num_tasks, random_seed=random_seed)
 coreset_size = 0
 vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size, path, multi_head, store_weights=store_weights)
@@ -93,25 +97,21 @@ vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
 # Store accuracies
 np.savez(path + 'test_acc.npz', acc=vcl_result)
 
-# Print result in a suitable format
-if data_gen.max_iter > 1:
-    for task_id in range(data_gen.max_iter):
-        for i in range(task_id + 1):
-            print vcl_result[task_id][i],
-        print ''
 
 # Random coreset
+tf.reset_default_graph()
+random_seed = 1
+tf.set_random_seed(random_seed+1)
+np.random.seed(random_seed)
+
 path = 'model_storage/permuted_coreset/'    # Path where to store files
+data_gen = PermutedMnistGenerator(max_iter=permuted_num_tasks, random_seed=random_seed)
 coreset_size = 200
-vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+vcl_result_coresets = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size, path, multi_head, store_weights=store_weights)
 
 # Store accuracies
-np.savez(path + 'test_acc.npz', acc=vcl_result)
+np.savez(path + 'test_acc.npz', acc=vcl_result_coresets)
 
-# Print result in a suitable format
-if data_gen.max_iter > 1:
-    for task_id in range(data_gen.max_iter):
-        for i in range(task_id + 1):
-            print vcl_result[task_id][i],
-        print ''
+# Plot average accuracy
+utils.plot('model_storage/permuted_mnist_', vcl_result, vcl_result_coresets)

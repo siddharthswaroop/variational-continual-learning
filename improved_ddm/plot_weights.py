@@ -139,9 +139,9 @@ def visualise_layer_weights(no_hiddens, path="", multi_head=False):
 if __name__ == "__main__":
     print 'Plotting weights for split MNIST'
     no_hiddens = [200]
-    path = 'model_storage/split_coreset/'
-    visualise_layer_weights(no_hiddens, path=path, multi_head=True)
     path = 'model_storage/split/'
+    visualise_layer_weights(no_hiddens, path=path, multi_head=True)
+    path = 'model_storage/split_coreset/'
     visualise_layer_weights(no_hiddens, path=path, multi_head=True)
 
     print 'Plotting weights for permuted MNIST'

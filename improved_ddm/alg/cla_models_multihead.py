@@ -143,7 +143,7 @@ class MFVI_NN(object):
         return log_lik
 
     # Initialise tf session
-    def init_session(self, task_idx, learning_rate, training_classes = []):
+    def init_session(self, task_idx, learning_rate, training_classes=[]):
 
         # Which variables are optimised (are allowed to change)
         vars_to_optimise = [self.lower_net.m, self.lower_net.v]
@@ -167,7 +167,7 @@ class MFVI_NN(object):
 
     # Train model
     def train(self, x_train, y_train, task_id, prior_lower, prior_upper,
-              no_epochs=1000, batch_size=100, display_epoch=20):
+              no_epochs=1000, batch_size=100, display_epoch=100):
 
         # Batch size
         N = x_train.shape[0]

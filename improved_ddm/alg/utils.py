@@ -1,5 +1,6 @@
 import numpy as np
-
+import matplotlib
+import matplotlib.pyplot as plt
 
 def merge_coresets(x_coresets, y_coresets):
     merged_x, merged_y = x_coresets[0], y_coresets[0]
@@ -43,3 +44,52 @@ def get_scores_output_pred(model, x_testsets, y_testsets, test_classes, task_idx
         acc.append(cur_acc)
 
     return acc
+
+
+def plot(path, vcl_result, vcl_result_coreset):
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    matplotlib.rcParams.update({'font.size': 22})
+
+    no_tasks = len(vcl_result)
+    result_avg = np.zeros(no_tasks)
+    result_coreset_avg = np.zeros(no_tasks)
+
+    plot_every_task = False
+
+    # Plot performance on every task
+    for i in range(no_tasks):
+        if plot_every_task:
+            fig = plt.figure(figsize=(5,3))
+            ax = plt.gca()
+            plt.plot(np.arange(i, no_tasks)+1, vcl_result_coreset[i:,i], label='VCL+coreset', marker='o', color='y')
+            plt.plot(np.arange(i, no_tasks) + 1, vcl_result[i:, i], label='VCL', marker='o', color='b')
+            ax.set_xticks(range(1, no_tasks+1))
+            ax.set_ylim([0.85, 1.01])
+            ax.set_yticks([0.85, 0.9, 0.95, 1.0])
+            ax.set_ylabel('Accuracy')
+            ax.set_xlabel('Tasks')
+            ax.set_title('Task %d (%d or %d)' % (i+1, 2*i, 2*i+1))
+            ax.legend()
+
+            fig.savefig(path+'accuracy_task_%d.svg' % (i), bbox_inches='tight')
+            plt.close()
+
+        result_avg[i] = np.average(vcl_result[i,:i+1])
+        result_coreset_avg[i] = np.average(vcl_result_coreset[i,:i+1])
+
+    # Plot average accuracy
+    fig = plt.figure(figsize=(5,3))
+    ax = plt.gca()
+    plt.plot(np.arange(no_tasks) + 1, result_coreset_avg, label='VCL+coreset', marker='o', color='y')
+    plt.plot(np.arange(no_tasks) + 1, result_avg, label='VCL', marker='o', color='b')
+    ax.set_xticks(range(1, no_tasks + 1))
+    ax.set_ylim([0.85, 1.01])
+    ax.set_yticks([0.85, 0.9, 0.95, 1.0])
+    ax.set_ylabel('Average Accuracy')
+    ax.set_xlabel('Tasks')
+    ax.set_title('Average')
+    ax.legend()
+
+    fig.savefig(path + 'average_accuracy.svg', bbox_inches='tight')
+    plt.close()

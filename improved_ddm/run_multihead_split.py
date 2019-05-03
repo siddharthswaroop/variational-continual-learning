@@ -6,6 +6,7 @@ import sys
 sys.path.extend(['alg/'])
 import vcl
 import coreset
+import utils
 
 
 class SplitMnistGenerator():
@@ -101,6 +102,9 @@ class SplitMnistGenerator():
 
             return next_x_train, next_y_train, next_x_test, next_y_test
 
+    def reset(self):
+        self.cur_iter = 0
+
 
 store_weights = True    # Store weights after training on each task (for plotting later)
 multi_head = True       # Multi-head or single-head network
@@ -109,16 +113,15 @@ hidden_size = [200]     # Size and number of hidden layers
 batch_size = 256        # Batch size
 no_epochs = 600         # Number of training epochs per task
 
+
+# No coreset
 tf.reset_default_graph()
 random_seed = 0
 tf.set_random_seed(random_seed+1)
 np.random.seed(random_seed)
 
-data_gen = SplitMnistGenerator()
-
-
-# No coreset
 path = 'model_storage/split/'   # Path where to store files
+data_gen = SplitMnistGenerator()
 coreset_size = 0
 vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size, path, multi_head, store_weights=store_weights)
@@ -126,25 +129,21 @@ vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
 # Store accuracies
 np.savez(path + 'test_acc.npz', acc=vcl_result)
 
-# Print in a suitable format
-if data_gen.max_iter > 1:
-    for task_id in range(data_gen.max_iter):
-        for i in range(task_id + 1):
-            print vcl_result[task_id][i],
-        print ''
 
 # Random coreset
+tf.reset_default_graph()
+random_seed = 0
+tf.set_random_seed(random_seed+1)
+np.random.seed(random_seed)
+
 path = 'model_storage/split_coreset/'   # Path where to store files
+data_gen = SplitMnistGenerator()
 coreset_size = 40
-vcl_result = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
+vcl_result_coresets = vcl.run_vcl_shared(hidden_size, no_epochs, data_gen,
     coreset.rand_from_batch, coreset_size, batch_size, path, multi_head, store_weights=store_weights)
 
 # Store accuracies
-np.savez(path + 'test_acc.npz', acc=vcl_result)
+np.savez(path + 'test_acc.npz', acc=vcl_result_coresets)
 
-# Print in a suitable format
-if data_gen.max_iter > 1:
-    for task_id in range(data_gen.max_iter):
-        for i in range(task_id + 1):
-            print vcl_result[task_id][i],
-        print ''
+# Plot average accuracy
+utils.plot('model_storage/split_mnist_', vcl_result, vcl_result_coresets)

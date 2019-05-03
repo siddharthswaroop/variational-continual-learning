@@ -1,6 +1,7 @@
 import numpy as np
 
-""" Random coreset selection """
+
+# Random coreset selection
 def rand_from_batch(x_coreset, y_coreset, x_train, y_train, coreset_size):
     # Randomly select from (x_train, y_train) and add to current coreset (x_coreset, y_coreset)
     idx = np.random.choice(x_train.shape[0], coreset_size, False)
@@ -10,7 +11,8 @@ def rand_from_batch(x_coreset, y_coreset, x_train, y_train, coreset_size):
     y_train = np.delete(y_train, idx, axis=0)
     return x_coreset, y_coreset, x_train, y_train    
 
-""" K-center coreset selection """
+
+# K-center coreset selection
 def k_center(x_coreset, y_coreset, x_train, y_train, coreset_size):
     # Select K centers from (x_train, y_train) and add to current coreset (x_coreset, y_coreset)
     dists = np.full(x_train.shape[0], np.inf)
@@ -29,6 +31,7 @@ def k_center(x_coreset, y_coreset, x_train, y_train, coreset_size):
     y_train = np.delete(y_train, idx, axis=0)
 
     return x_coreset, y_coreset, x_train, y_train
+
 
 def update_distance(dists, x_train, current_id):
     for i in range(x_train.shape[0]):
